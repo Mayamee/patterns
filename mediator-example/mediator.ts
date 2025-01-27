@@ -1,26 +1,36 @@
-import { IMessenger, IUser, IGroupController, IGroup } from "./types";
+import {
+  IMessenger,
+  IUser,
+  IGroupService,
+  IGroup,
+  OperationStatus,
+} from "./types";
 
 export class Telegram implements IMessenger {
   private users: Set<IUser> = new Set();
 
-  constructor(private readonly groupController: IGroupController) {}
+  constructor(private readonly groupService: IGroupService) {}
 
   public addUser(user: IUser): void {
     this.users.add(user);
   }
 
   public createGroup(name: string, issuer: IUser): string {
-    const group = this.groupController.createGroup(name, issuer);
+    const group = this.groupService.createGroup(name, issuer);
 
     return group.groupId;
   }
 
-  public addMemberToGroup(groupId: string, user: IUser, issuer: IUser): void {
-    this.groupController.addMemberToGroup(groupId, user, issuer);
+  public addMemberToGroup(
+    groupId: string,
+    user: IUser,
+    issuer: IUser
+  ): OperationStatus {
+    return this.groupService.addMemberToGroup(groupId, user, issuer);
   }
 
-  public deleteGroup(groupId: string, issuer: IUser): boolean {
-    return this.groupController.deleteGroupById(groupId, issuer);
+  public deleteGroup(groupId: string, issuer: IUser): OperationStatus {
+    return this.groupService.deleteGroupById(groupId, issuer);
   }
 
   public sendMessage(message: string, sender: IUser, target: IUser): void {
@@ -35,6 +45,36 @@ export class Telegram implements IMessenger {
     target.onMessage(moderatedMessage, sender);
   }
 
+  public sendGroupMessage(
+    groupId: string,
+    message: string,
+    sender: IUser
+  ): void {
+    const moderatedMessage = this.moderateMessage(message);
+
+    this.groupService.sendMessageToGroup(groupId, moderatedMessage, sender);
+  }
+
+  public renameGroup(
+    groupId: string,
+    name: string,
+    issuer: IUser
+  ): OperationStatus {
+    return this.groupService.setGroupName(groupId, name, issuer);
+  }
+
+  public kickFromGroup(
+    groupId: string,
+    user: IUser,
+    issuer: IUser
+  ): OperationStatus {
+    return this.groupService.removeMemberFromGroup(groupId, user, issuer);
+  }
+
+  public getGroupsByUser(user: IUser): IGroup[] {
+    return this.groupService.getGroupsByUser(user);
+  }
+
   private moderateMessage(message: string): string {
     if (
       ["xxx", "make", "me", "slap", "move"].some((word) => message === word)
@@ -43,47 +83,5 @@ export class Telegram implements IMessenger {
     }
 
     return message;
-  }
-
-  public sendGroupMessage(
-    groupId: string,
-    message: string,
-    sender: IUser
-  ): void {
-    const moderatedMessage = this.moderateMessage(message);
-
-    this.groupController.sendMessageToGroup(groupId, moderatedMessage, sender);
-  }
-
-  public renameGroup(groupId: string, name: string, issuer: IUser): void {
-    const isRenameOperationSuccess = this.groupController.setGroupName(
-      groupId,
-      name,
-      issuer
-    );
-
-    if (isRenameOperationSuccess) {
-      console.info(`Group ${groupId} renamed to ${name}`);
-    } else {
-      console.info(`User ${issuer.name} can't rename the group`);
-    }
-  }
-
-  public kickFromGroup(groupId: string, user: IUser, issuer: IUser): void {
-    const isSuccess = this.groupController.removeMemberFromGroup(
-      groupId,
-      user,
-      issuer
-    );
-
-    if (!isSuccess) {
-      console.info(
-        `User ${issuer.name} can't kick user ${user.name} from the group`
-      );
-    }
-  }
-
-  public getGroupsByUser(user: IUser): IGroup[] {
-    return this.groupController.getGroupsByUser(user);
   }
 }

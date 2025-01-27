@@ -1,9 +1,11 @@
 import {
   IGroup,
-  IGroupController,
+  IGroupService,
   IGroupFactory,
   IUniqIdGenerator,
   IUser,
+  OperationStatus,
+  IGroupMember,
 } from "./types";
 
 export class UniqIdGenerator implements IUniqIdGenerator {
@@ -15,8 +17,8 @@ export class UniqIdGenerator implements IUniqIdGenerator {
 }
 
 export class Group implements IGroup {
-  private members: Set<IUser> = new Set();
-  private admins: Set<IUser> = new Set();
+  private members: Set<IGroupMember> = new Set();
+  private admins: Set<IGroupMember> = new Set();
 
   constructor(
     public name: string,
@@ -33,20 +35,28 @@ export class Group implements IGroup {
     });
   }
 
-  public setName(name: string, issuer: IUser): boolean {
+  public setName(name: string, issuer: IGroupMember): OperationStatus {
     if (this.checkIsOwner(issuer) && this.checkIsAdmin(issuer)) {
       this.name = name;
 
-      return true;
+      return {
+        isSuccess: true,
+        errorMessage: null,
+      };
     }
 
-    return false;
+    return {
+      isSuccess: false,
+      errorMessage: "You don't have permissions to change the group name",
+    };
   }
 
-  public addMember(user: IUser, issuer: IUser): boolean {
+  public addMember(user: IGroupMember, issuer: IGroupMember): OperationStatus {
     if (!this.checkIsAdmin(issuer) && !this.checkIsOwner(issuer)) {
-      console.info(`User ${issuer.name} can't add a member to the group`);
-      return false;
+      return {
+        isSuccess: false,
+        errorMessage: "You don't have permissions to add a member",
+      };
     }
 
     this.members.add(user);
@@ -58,81 +68,101 @@ export class Group implements IGroup {
       );
     });
 
-    return true;
+    return {
+      isSuccess: true,
+      errorMessage: null,
+    };
   }
 
-  public checkIsMember(user: IUser): boolean {
+  public checkIsMember(user: IGroupMember): boolean {
     return this.members.has(user);
   }
 
-  public checkIsOwner(user: IUser): boolean {
+  public checkIsOwner(user: IGroupMember): boolean {
     return this.owner === user;
   }
 
-  private checkIsAdmin(user: IUser): boolean {
+  private checkIsAdmin(user: IGroupMember): boolean {
     return this.admins.has(user);
   }
 
-  private isMember(user: IUser): boolean {
+  private isMember(user: IGroupMember): boolean {
     return this.members.has(user);
   }
 
-  public addAdmin(user: IUser, issuer: IUser): void {
+  public addAdmin(user: IGroupMember, issuer: IGroupMember): OperationStatus {
     if (!this.checkIsOwner(issuer)) {
-      console.info(`User ${issuer.name} is not an owner of the group`);
-
-      return;
+      return {
+        isSuccess: false,
+        errorMessage: "You don't have permissions to add an admin",
+      };
     }
 
     this.admins.add(user);
+
+    return {
+      isSuccess: true,
+      errorMessage: null,
+    };
   }
 
-  public removeMember(user: IUser, issuer: IUser): boolean {
+  public removeMember(user: IGroupMember, issuer: IGroupMember): OperationStatus {
     if (!this.isMember(user)) {
-      console.info(
-        `User ${user.name} is not a member of the group ${this.name}`
-      );
-
-      return false;
+      return {
+        isSuccess: false,
+        errorMessage: "User is not a member of the group",
+      };
     }
 
     if (this.checkIsOwner(user)) {
-      console.info(`Owner ${user.name} can't be removed from the group`);
-
-      return false;
+      return {
+        isSuccess: false,
+        errorMessage: "Owner can't be removed from the group",
+      };
     }
 
     const isIssuerTryingToRemoveHimself = issuer === user;
 
     if (isIssuerTryingToRemoveHimself) {
-      console.info(`User ${issuer.name} leave from the group ${this.name}`);
-
       this.kickUserFromGroup(user);
-      return true;
+      return {
+        isSuccess: true,
+        errorMessage: null,
+      };
     }
 
     if (this.checkIsOwner(issuer)) {
       this.kickUserFromGroup(user);
 
-      return true;
+      return {
+        isSuccess: true,
+        errorMessage: null,
+      };
     }
 
     if (this.checkIsAdmin(issuer) && this.checkIsAdmin(user)) {
-      console.info(`Admin ${issuer.name} can't remove another admin`);
-
-      return false;
+      return {
+        isSuccess: false,
+        errorMessage: "Admin can't remove another admin",
+      };
     }
 
     if (this.checkIsAdmin(issuer) && !this.checkIsAdmin(user)) {
       this.kickUserFromGroup(user);
 
-      return true;
+      return {
+        isSuccess: true,
+        errorMessage: null,
+      };
     }
 
-    return false;
+    return {
+      isSuccess: false,
+      errorMessage: "You don't have permissions to remove a member",
+    };
   }
 
-  private kickUserFromGroup(user: IUser) {
+  private kickUserFromGroup(user: IGroupMember) {
     user.onKickFromGroup(this.groupId);
     this.members.delete(user);
     this.admins.delete(user);
@@ -142,18 +172,22 @@ export class Group implements IGroup {
     );
   }
 
-  public sendMessage(message: string, sender: IUser): boolean {
+  public sendMessage(message: string, sender: IGroupMember): OperationStatus {
     if (!this.isMember(sender)) {
-      console.info(`User ${sender.name} is not a member of the group`);
-
-      return false;
+      return {
+        isSuccess: false,
+        errorMessage: "You are not a member of the group",
+      };
     }
 
     this.members.forEach((member) => {
       member.onGroupMessage(message, this.groupId, sender);
     });
 
-    return true;
+    return {
+      isSuccess: true,
+      errorMessage: null,
+    };
   }
 }
 
@@ -167,7 +201,7 @@ export class GroupFactory implements IGroupFactory {
   }
 }
 
-export class GroupController implements IGroupController {
+export class GroupService implements IGroupService {
   private readonly groups: Map<string, IGroup> = new Map();
 
   constructor(private readonly groupFactory: IGroupFactory) {}
@@ -194,13 +228,14 @@ export class GroupController implements IGroupController {
     groupId: string,
     user: IUser,
     issuer: IUser
-  ): boolean {
+  ): OperationStatus {
     const group = this.groups.get(groupId);
 
     if (!group) {
-      console.info(`Group ${groupId} doesn't exist`);
-
-      return false;
+      return {
+        isSuccess: false,
+        errorMessage: "Group doesn't exist",
+      };
     }
 
     return group.addMember(user, issuer);
@@ -210,13 +245,14 @@ export class GroupController implements IGroupController {
     groupId: string,
     user: IUser,
     issuer: IUser
-  ): boolean {
+  ): OperationStatus {
     const group = this.groups.get(groupId);
 
     if (!group) {
-      console.info(`Group ${groupId} doesn't exist`);
-
-      return false;
+      return {
+        isSuccess: false,
+        errorMessage: "Group doesn't exist",
+      };
     }
 
     return group.removeMember(user, issuer);
@@ -226,49 +262,61 @@ export class GroupController implements IGroupController {
     groupId: string,
     message: string,
     sender: IUser
-  ): boolean {
+  ): OperationStatus {
     const group = this.groups.get(groupId);
 
     if (!group) {
-      console.info(`Group ${groupId} doesn't exist`);
-
-      return false;
+      return {
+        isSuccess: false,
+        errorMessage: "Group doesn't exist",
+      };
     }
 
     return group.sendMessage(message, sender);
   }
 
-  public setGroupName(groupId: string, name: string, issuer: IUser): boolean {
+  public setGroupName(
+    groupId: string,
+    name: string,
+    issuer: IUser
+  ): OperationStatus {
     const group = this.groups.get(groupId);
 
     if (!group) {
-      console.info(`Group ${groupId} doesn't exist`);
-
-      return false;
+      return {
+        isSuccess: false,
+        errorMessage: "Group doesn't exist",
+      };
     }
 
     return group.setName(name, issuer);
   }
 
-  public deleteGroupById(groupId: string, issuer: IUser): boolean {
+  public deleteGroupById(groupId: string, issuer: IUser): OperationStatus {
     const group = this.groups.get(groupId);
 
     if (!group) {
-      console.info(`Group with id ${groupId} doesn't exist`);
-
-      return false;
+      return {
+        isSuccess: false,
+        errorMessage: "Group doesn't exist",
+      };
     }
 
     const isIssuerOwner = group.checkIsOwner(issuer);
 
     if (!isIssuerOwner) {
-      console.info(`User ${issuer.name} is not an owner of the group`);
-      return false;
+      return {
+        isSuccess: false,
+        errorMessage: "You are not an owner of the group",
+      };
     }
 
     group.onDestroy();
     this.groups.delete(groupId);
 
-    return true;
+    return {
+      isSuccess: true,
+      errorMessage: null,
+    };
   }
 }

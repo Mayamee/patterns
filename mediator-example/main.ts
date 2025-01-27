@@ -1,10 +1,10 @@
-import { GroupController, GroupFactory, UniqIdGenerator } from "./group";
+import { GroupService, GroupFactory, UniqIdGenerator } from "./group";
 import { Telegram } from "./mediator";
 import { User } from "./user";
 
 const groupFactory = new GroupFactory(new UniqIdGenerator());
 
-const groupController = new GroupController(groupFactory);
+const groupController = new GroupService(groupFactory);
 
 // Создаем медиатор
 const telegram = new Telegram(groupController);

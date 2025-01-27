@@ -7,22 +7,8 @@ export class User implements IUser {
     this.messenger.sendMessage(message, this, target);
   }
 
-  public onMessage(message: string, sender: IUser): void {
-    console.log(
-      `${this.name} received message from ${sender.name}: ${message}`
-    );
-  }
-
   public sendGroupMessage(groupId: string, message: string): void {
     this.messenger.sendGroupMessage(groupId, message, this);
-  }
-
-  public onGroupMessage(message: string, groupId: string, sender?: IUser): void {
-    const senderName = sender ? sender.name : "group-main-channel";
-
-    console.log(
-      `${this.name} received group ${groupId} message from [${senderName}]: ${message}`
-    );
   }
 
   public createGroup(name: string): string {
@@ -38,18 +24,8 @@ export class User implements IUser {
     this.messenger.deleteGroup(groupId, this);
   }
 
-  // unregisterGroup
-  public onGroupDeleted(groupId: string): void {
-    console.info(`User ${this.name} unregistered from group ${groupId}`);
-  }
-
   public inviteToGroup(groupId: string, user: IUser): void {
     this.messenger.addMemberToGroup(groupId, user, this);
-  }
-
-  // ??? boolean для пайплайна добавления???
-  public onAddMemberToGroup(groupId: string): void {
-    console.log(`${this.name} received group invite: ${groupId}`);
   }
 
   // TODO можно расширить до объекта, который передает весь контекст переименования
@@ -63,8 +39,35 @@ export class User implements IUser {
     this.messenger.kickFromGroup(groupId, user, this);
   }
 
+  public onMessage(message: string, sender: IUser): void {
+    console.log(
+      `${this.name} received message from ${sender.name}: ${message}`
+    );
+  }
+
   public onKickFromGroup(groupId: string): void {
     this.onGroupDeleted(groupId);
     console.info(`User ${this.name} was kicked from group ${groupId}`);
+  }
+
+  // ??? boolean для пайплайна добавления???
+  public onAddMemberToGroup(groupId: string): void {
+    console.log(`${this.name} received group invite: ${groupId}`);
+  }
+
+  public onGroupDeleted(groupId: string): void {
+    console.info(`User ${this.name} unregistered from group ${groupId}`);
+  }
+
+  public onGroupMessage(
+    message: string,
+    groupId: string,
+    sender?: IUser
+  ): void {
+    const senderName = sender ? sender.name : "group-main-channel";
+
+    console.log(
+      `${this.name} received group ${groupId} message from [${senderName}]: ${message}`
+    );
   }
 }
