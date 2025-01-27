@@ -3,7 +3,6 @@ import {
   IGroupService,
   IGroupFactory,
   IUniqIdGenerator,
-  IUser,
   OperationStatus,
   IGroupMember,
 } from "./types";
@@ -22,7 +21,7 @@ export class Group implements IGroup {
 
   constructor(
     public name: string,
-    private readonly owner: IUser,
+    private readonly owner: IGroupMember,
     public readonly groupId: string
   ) {
     this.members.add(owner);
@@ -194,7 +193,7 @@ export class Group implements IGroup {
 export class GroupFactory implements IGroupFactory {
   constructor(private readonly uniqIdGenerator: IUniqIdGenerator) {}
 
-  public makeGroup(name: string, owner: IUser): IGroup {
+  public makeGroup(name: string, owner: IGroupMember): IGroup {
     const uniqId = this.uniqIdGenerator.generateId();
 
     return new Group(name, owner, uniqId);
@@ -206,7 +205,7 @@ export class GroupService implements IGroupService {
 
   constructor(private readonly groupFactory: IGroupFactory) {}
 
-  public getGroupsByUser(user: IUser): IGroup[] {
+  public getGroupsByUser(user: IGroupMember): IGroup[] {
     return Array.from(this.groups.values()).filter((group) =>
       group.checkIsMember(user)
     );
@@ -216,7 +215,7 @@ export class GroupService implements IGroupService {
     return this.groups.get(groupId) ?? null;
   }
 
-  public createGroup(name: string, owner: IUser): IGroup {
+  public createGroup(name: string, owner: IGroupMember): IGroup {
     const group = this.groupFactory.makeGroup(name, owner);
 
     this.groups.set(group.groupId, group);
@@ -226,8 +225,8 @@ export class GroupService implements IGroupService {
 
   public addMemberToGroup(
     groupId: string,
-    user: IUser,
-    issuer: IUser
+    user: IGroupMember,
+    issuer: IGroupMember
   ): OperationStatus {
     const group = this.groups.get(groupId);
 
@@ -243,8 +242,8 @@ export class GroupService implements IGroupService {
 
   public removeMemberFromGroup(
     groupId: string,
-    user: IUser,
-    issuer: IUser
+    user: IGroupMember,
+    issuer: IGroupMember
   ): OperationStatus {
     const group = this.groups.get(groupId);
 
@@ -261,7 +260,7 @@ export class GroupService implements IGroupService {
   public sendMessageToGroup(
     groupId: string,
     message: string,
-    sender: IUser
+    sender: IGroupMember
   ): OperationStatus {
     const group = this.groups.get(groupId);
 
@@ -278,7 +277,7 @@ export class GroupService implements IGroupService {
   public setGroupName(
     groupId: string,
     name: string,
-    issuer: IUser
+    issuer: IGroupMember
   ): OperationStatus {
     const group = this.groups.get(groupId);
 
@@ -292,7 +291,7 @@ export class GroupService implements IGroupService {
     return group.setName(name, issuer);
   }
 
-  public deleteGroupById(groupId: string, issuer: IUser): OperationStatus {
+  public deleteGroupById(groupId: string, issuer: IGroupMember): OperationStatus {
     const group = this.groups.get(groupId);
 
     if (!group) {

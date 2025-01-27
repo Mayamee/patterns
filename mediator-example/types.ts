@@ -51,7 +51,7 @@ export interface IGroup {
   onDestroy(): void;
   checkIsOwner(user: IGroupMember): boolean;
   checkIsMember(user: IGroupMember): boolean;
-  setName(name: string, issuer: IUser): OperationStatus;
+  setName(name: string, issuer: IGroupMember): OperationStatus;
   addMember(user: IGroupMember, issuer: IGroupMember): OperationStatus;
   removeMember(user: IGroupMember, issuer: IGroupMember): OperationStatus;
   sendMessage(message: string, sender: IGroupMember): OperationStatus;
@@ -90,4 +90,13 @@ export interface IGroupFactory {
 
 export interface IUniqIdGenerator {
   generateId(): string;
+}
+
+export type LoggerContext = {
+  severity?: string;
+  additionalInfo?: string;
+};
+
+export interface ILogger {
+  log(message: string, ctx?: LoggerContext): void;
 }
