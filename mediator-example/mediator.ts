@@ -20,9 +20,7 @@ export class Telegram implements IMessenger {
   }
 
   public deleteGroup(groupId: string, issuer: IUser): boolean {
-    const isSuccess = this.groupController.deleteGroupById(groupId, issuer);
-
-    return isSuccess;
+    return this.groupController.deleteGroupById(groupId, issuer);
   }
 
   public sendMessage(message: string, sender: IUser, target: IUser): void {
