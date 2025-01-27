@@ -1,61 +1,28 @@
-import { IMessenger, IUser, IGroup, IGroupFactory } from "./types";
+import { IMessenger, IUser, IGroupController, IGroup } from "./types";
 
 export class Telegram implements IMessenger {
   private users: Set<IUser> = new Set();
 
-  private groups: Map<string, IGroup> = new Map();
-
-  constructor(private readonly groupFactory: IGroupFactory) {}
+  constructor(private readonly groupController: IGroupController) {}
 
   public addUser(user: IUser): void {
     this.users.add(user);
   }
 
   public createGroup(name: string, issuer: IUser): string {
-    const group = this.groupFactory.makeGroup(name, issuer);
-
-    this.groups.set(group.groupId, group);
+    const group = this.groupController.createGroup(name, issuer);
 
     return group.groupId;
   }
 
   public addMemberToGroup(groupId: string, user: IUser, issuer: IUser): void {
-    const groupInstance = this.groups.get(groupId);
-
-    if (!groupInstance) {
-      console.info(`Group ${groupId} doesn't exist`);
-      return;
-    }
-
-    const isOperationSuccess = groupInstance.addMember(user, issuer);
-
-    if (isOperationSuccess) {
-      // Можно назвать receiveGroupInvite
-      user.onAddMemberToGroup(groupInstance.groupId);
-    }
+    this.groupController.addMemberToGroup(groupId, user, issuer);
   }
 
-  public deleteGroup(groupId: string, issuer: IUser): void {
-    const group = this.groups.get(groupId);
+  public deleteGroup(groupId: string, issuer: IUser): boolean {
+    const isSuccess = this.groupController.deleteGroupById(groupId, issuer);
 
-    if (!group) {
-      console.info(`Group with id ${groupId} doesn't exist`);
-
-      return;
-    }
-
-    const isIssuerOwner = group.checkIsOwner(issuer);
-
-    if (!isIssuerOwner) {
-      console.info(`User ${issuer.name} is not an owner of the group`);
-      return;
-    }
-
-    this.users.forEach((user) => {
-      user.onGroupDeleted(groupId);
-    });
-
-    this.groups.delete(groupId);
+    return isSuccess;
   }
 
   public sendMessage(message: string, sender: IUser, target: IUser): void {
@@ -81,31 +48,21 @@ export class Telegram implements IMessenger {
   }
 
   public sendGroupMessage(
-    message: string,
     groupId: string,
+    message: string,
     sender: IUser
   ): void {
-    const group = this.groups.get(groupId);
-
-    if (!group) {
-      console.info(`Group with id ${groupId} doesn't exist`);
-      return;
-    }
-
     const moderatedMessage = this.moderateMessage(message);
 
-    group.sendMessage(moderatedMessage, sender);
+    this.groupController.sendMessageToGroup(groupId, moderatedMessage, sender);
   }
 
   public renameGroup(groupId: string, name: string, issuer: IUser): void {
-    const group = this.groups.get(groupId);
-
-    if (!group) {
-      console.info(`Group with id ${groupId} doesn't exist`);
-      return;
-    }
-
-    const isRenameOperationSuccess = group.setName(name, issuer);
+    const isRenameOperationSuccess = this.groupController.setGroupName(
+      groupId,
+      name,
+      issuer
+    );
 
     if (isRenameOperationSuccess) {
       console.info(`Group ${groupId} renamed to ${name}`);
@@ -115,22 +72,20 @@ export class Telegram implements IMessenger {
   }
 
   public kickFromGroup(groupId: string, user: IUser, issuer: IUser): void {
-    const group = this.groups.get(groupId);
+    const isSuccess = this.groupController.removeMemberFromGroup(
+      groupId,
+      user,
+      issuer
+    );
 
-    if (!group) {
-      console.info(`Group with id ${groupId} doesn't exist`);
-      return;
-    }
-
-    const isSuccess = group.removeMember(user, issuer);
-
-    if (isSuccess) {
-      user.onKickFromGroup(groupId);
-      console.info(`User ${user.name} was kicked from the group ${group.name}`);
-    } else {
+    if (!isSuccess) {
       console.info(
         `User ${issuer.name} can't kick user ${user.name} from the group`
       );
     }
+  }
+
+  public getGroupsByUser(user: IUser): IGroup[] {
+    return this.groupController.getGroupsByUser(user);
   }
 }

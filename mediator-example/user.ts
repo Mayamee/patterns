@@ -1,8 +1,6 @@
 import { IMessenger, IUser } from "./types";
 
 export class User implements IUser {
-  private groupIds: Set<string> = new Set();
-
   constructor(public name: string, private readonly messenger: IMessenger) {}
 
   public sendMessage(message: string, target: IUser): void {
@@ -15,23 +13,15 @@ export class User implements IUser {
     );
   }
 
-  public sendGroupMessage(message: string, groupId: string): void {
-    this.messenger.sendGroupMessage(message, groupId, this);
+  public sendGroupMessage(groupId: string, message: string): void {
+    this.messenger.sendGroupMessage(groupId, message, this);
   }
 
-  public onGroupMessage(
-    message: string,
-    groupId: string,
-    sender: IUser
-  ): void {
-    if (!this.groupIds.has(groupId)) {
-      console.info(`User ${this.name} is not a member of the group ${groupId}`);
-
-      return;
-    }
+  public onGroupMessage(message: string, groupId: string, sender?: IUser): void {
+    const senderName = sender ? sender.name : "group-main-channel";
 
     console.log(
-      `${this.name} received group ${groupId} message from ${sender.name}: ${message}`
+      `${this.name} received group ${groupId} message from [${senderName}]: ${message}`
     );
   }
 
@@ -40,38 +30,26 @@ export class User implements IUser {
 
     const groupId = this.messenger.createGroup(name, this);
 
-    this.groupIds.add(groupId);
-
     //? INFO костыль для теста
     return groupId;
   }
 
   public deleteGroup(groupId: string): void {
-    // Можно вынести в unregisterGroup
-    if (!this.groupIds.has(groupId)) {
-      console.info(`User ${this.name} is not a member of the group ${groupId}`);
-
-      return;
-    }
-
     this.messenger.deleteGroup(groupId, this);
   }
 
   // unregisterGroup
   public onGroupDeleted(groupId: string): void {
     console.info(`User ${this.name} unregistered from group ${groupId}`);
-
-    this.groupIds.delete(groupId);
   }
 
   public inviteToGroup(groupId: string, user: IUser): void {
     this.messenger.addMemberToGroup(groupId, user, this);
   }
 
+  // ??? boolean для пайплайна добавления???
   public onAddMemberToGroup(groupId: string): void {
     console.log(`${this.name} received group invite: ${groupId}`);
-
-    this.groupIds.add(groupId);
   }
 
   // TODO можно расширить до объекта, который передает весь контекст переименования

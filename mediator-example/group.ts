@@ -1,4 +1,10 @@
-import { IGroup, IGroupFactory, IUniqIdGenerator, IUser } from "./types";
+import {
+  IGroup,
+  IGroupController,
+  IGroupFactory,
+  IUniqIdGenerator,
+  IUser,
+} from "./types";
 
 export class UniqIdGenerator implements IUniqIdGenerator {
   private id: number = 0;
@@ -21,6 +27,12 @@ export class Group implements IGroup {
     this.admins.add(owner);
   }
 
+  public onDestroy(): void {
+    this.members.forEach((member) => {
+      member.onGroupDeleted(this.groupId);
+    });
+  }
+
   public setName(name: string, issuer: IUser): boolean {
     if (this.checkIsOwner(issuer) && this.checkIsAdmin(issuer)) {
       this.name = name;
@@ -38,8 +50,19 @@ export class Group implements IGroup {
     }
 
     this.members.add(user);
+    user.onAddMemberToGroup(this.groupId);
+    this.members.forEach((member) => {
+      member.onGroupMessage(
+        `${user.name} was added to the group ${this.groupId}`,
+        this.groupId
+      );
+    });
 
     return true;
+  }
+
+  public checkIsMember(user: IUser): boolean {
+    return this.members.has(user);
   }
 
   public checkIsOwner(user: IUser): boolean {
@@ -84,14 +107,12 @@ export class Group implements IGroup {
     if (isIssuerTryingToRemoveHimself) {
       console.info(`User ${issuer.name} leave from the group ${this.name}`);
 
-      this.members.delete(issuer);
-      this.admins.delete(issuer);
+      this.kickUserFromGroup(user);
       return true;
     }
 
     if (this.checkIsOwner(issuer)) {
-      this.members.delete(user);
-      this.admins.delete(user);
+      this.kickUserFromGroup(user);
 
       return true;
     }
@@ -103,7 +124,7 @@ export class Group implements IGroup {
     }
 
     if (this.checkIsAdmin(issuer) && !this.checkIsAdmin(user)) {
-      this.members.delete(user);
+      this.kickUserFromGroup(user);
 
       return true;
     }
@@ -111,16 +132,28 @@ export class Group implements IGroup {
     return false;
   }
 
-  public sendMessage(message: string, sender: IUser): void {
+  private kickUserFromGroup(user: IUser) {
+    user.onKickFromGroup(this.groupId);
+    this.members.delete(user);
+    this.admins.delete(user);
+    this.sendMessage(
+      `${user.name} was kicked from the group ${this.groupId}`,
+      this.owner
+    );
+  }
+
+  public sendMessage(message: string, sender: IUser): boolean {
     if (!this.isMember(sender)) {
       console.info(`User ${sender.name} is not a member of the group`);
 
-      return;
+      return false;
     }
 
     this.members.forEach((member) => {
       member.onGroupMessage(message, this.groupId, sender);
     });
+
+    return true;
   }
 }
 
@@ -131,5 +164,111 @@ export class GroupFactory implements IGroupFactory {
     const uniqId = this.uniqIdGenerator.generateId();
 
     return new Group(name, owner, uniqId);
+  }
+}
+
+export class GroupController implements IGroupController {
+  private readonly groups: Map<string, IGroup> = new Map();
+
+  constructor(private readonly groupFactory: IGroupFactory) {}
+
+  public getGroupsByUser(user: IUser): IGroup[] {
+    return Array.from(this.groups.values()).filter((group) =>
+      group.checkIsMember(user)
+    );
+  }
+
+  public getGroupById(groupId: string): IGroup | null {
+    return this.groups.get(groupId) ?? null;
+  }
+
+  public createGroup(name: string, owner: IUser): IGroup {
+    const group = this.groupFactory.makeGroup(name, owner);
+
+    this.groups.set(group.groupId, group);
+
+    return group;
+  }
+
+  public addMemberToGroup(
+    groupId: string,
+    user: IUser,
+    issuer: IUser
+  ): boolean {
+    const group = this.groups.get(groupId);
+
+    if (!group) {
+      console.info(`Group ${groupId} doesn't exist`);
+
+      return false;
+    }
+
+    return group.addMember(user, issuer);
+  }
+
+  public removeMemberFromGroup(
+    groupId: string,
+    user: IUser,
+    issuer: IUser
+  ): boolean {
+    const group = this.groups.get(groupId);
+
+    if (!group) {
+      console.info(`Group ${groupId} doesn't exist`);
+
+      return false;
+    }
+
+    return group.removeMember(user, issuer);
+  }
+
+  public sendMessageToGroup(
+    groupId: string,
+    message: string,
+    sender: IUser
+  ): boolean {
+    const group = this.groups.get(groupId);
+
+    if (!group) {
+      console.info(`Group ${groupId} doesn't exist`);
+
+      return false;
+    }
+
+    return group.sendMessage(message, sender);
+  }
+
+  public setGroupName(groupId: string, name: string, issuer: IUser): boolean {
+    const group = this.groups.get(groupId);
+
+    if (!group) {
+      console.info(`Group ${groupId} doesn't exist`);
+
+      return false;
+    }
+
+    return group.setName(name, issuer);
+  }
+
+  public deleteGroupById(groupId: string, issuer: IUser): boolean {
+    const group = this.groups.get(groupId);
+
+    if (!group) {
+      console.info(`Group with id ${groupId} doesn't exist`);
+
+      return false;
+    }
+
+    const isIssuerOwner = group.checkIsOwner(issuer);
+
+    if (!isIssuerOwner) {
+      console.info(`User ${issuer.name} is not an owner of the group`);
+      return false;
+    }
+
+    group.onDestroy();
+    this.groups.delete(groupId);
+
+    return true;
   }
 }

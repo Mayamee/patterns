@@ -1,9 +1,13 @@
-import { GroupFactory, UniqIdGenerator } from "./group";
+import { GroupController, GroupFactory, UniqIdGenerator } from "./group";
 import { Telegram } from "./mediator";
 import { User } from "./user";
 
+const groupFactory = new GroupFactory(new UniqIdGenerator());
+
+const groupController = new GroupController(groupFactory);
+
 // Создаем медиатор
-const telegram = new Telegram(new GroupFactory(new UniqIdGenerator()));
+const telegram = new Telegram(groupController);
 
 // Пользователи берут в руки телефон, называют как то себя и используют telegram
 const mark = new User("Mark", telegram);
@@ -23,23 +27,22 @@ const markGroupId = mark.createGroup("Cool group");
 mark.inviteToGroup(markGroupId, semen);
 
 // Марк пишет в группу
-mark.sendGroupMessage("Hello, Semen", markGroupId);
+mark.sendGroupMessage(markGroupId, "Hello, Semen");
 // Семён отвечает Марку
-semen.sendGroupMessage("Hello, Mark", markGroupId);
+semen.sendGroupMessage(markGroupId, "Hello, Mark");
 // Ник пытается отправить сообщение, но ничего не получается, звонит марку и говорит пригласи
-nick.sendGroupMessage("Hello, Mark", markGroupId);
+nick.sendGroupMessage(markGroupId, "Hello, Mark");
 // Марк приглашает Ника в группу
 mark.inviteToGroup(markGroupId, nick);
 // Ник радуется такой щедрости и пишет
-nick.sendGroupMessage("Hello, Everybody!", markGroupId);
+nick.sendGroupMessage(markGroupId, "Hello, Everybody!");
 // Ник становится злой и решает удалить Марка из его группы
 nick.kickFromGroup(markGroupId, mark);
 // Марк видит и злится на Ника, и кикает его в ответ
-mark.sendGroupMessage("I'll kick you, Nick", markGroupId);
+mark.sendGroupMessage(markGroupId, "I'll kick you, Nick");
 mark.kickFromGroup(markGroupId, nick);
 // Ник пытается написать но уже тщетно
-nick.sendGroupMessage("How was it happen?", markGroupId);
-
+nick.sendGroupMessage(markGroupId, "How was it happen?");
 
 /* Старый вариант использования,
 ссылку на требуемый класс можно передавать различными способами,
