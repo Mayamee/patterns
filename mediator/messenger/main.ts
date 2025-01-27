@@ -1,15 +1,17 @@
 import { GroupService, GroupFactory, UniqIdGenerator } from "./group";
-import { Logger, Telegram } from "./mediator";
+import { Logger, Moderator, Telegram } from "./mediator";
 import { User } from "./user";
 
 const groupFactory = new GroupFactory(new UniqIdGenerator());
 
 const logger = new Logger();
 
+const moderator = new Moderator();
+
 const groupController = new GroupService(groupFactory);
 
 // Создаем медиатор
-const telegram = new Telegram(groupController, logger);
+const telegram = new Telegram(groupController, logger, moderator);
 
 // Пользователи берут в руки телефон, называют как то себя и используют telegram
 const mark = new User("Mark", telegram);

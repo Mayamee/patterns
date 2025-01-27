@@ -17,6 +17,10 @@ export interface IUser extends IGroupMember {
   onMessage(message: string, sender: IUser): void;
 }
 
+export interface IModerator {
+  moderateMessage(message: string): string;
+}
+
 export interface IMessenger {
   sendMessage(message: string, sender: IUser, target: IUser): void;
   sendGroupMessage(

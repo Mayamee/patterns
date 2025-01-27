@@ -6,6 +6,7 @@ import {
   OperationStatus,
   ILogger,
   LoggerContext,
+  IModerator,
 } from "./types";
 
 export class Logger implements ILogger {
@@ -33,15 +34,36 @@ export class Logger implements ILogger {
   }
 }
 
+export class Moderator implements IModerator {
+  public moderateMessage(message: string): string {
+    if (
+      ["xxx", "make", "me", "slap", "move"].some((word) => message === word)
+    ) {
+      return "Message is not allowed";
+    }
+
+    return message;
+  }
+}
+
 export class Telegram implements IMessenger {
   private users: Set<IUser> = new Set();
 
   constructor(
     private readonly _groupService: IGroupService,
-    private readonly _logger: ILogger
+    private readonly _logger: ILogger,
+    private readonly _moderator: IModerator
   ) {}
 
   public addUser(user: IUser): void {
+    if (this.users.has(user)) {
+      this._logger.warning(
+        `User ${user.name} already registered in the messenger`
+      );
+
+      return;
+    }
+
     this.users.add(user);
   }
 
@@ -72,7 +94,7 @@ export class Telegram implements IMessenger {
       return;
     }
 
-    const moderatedMessage = this.moderateMessage(message);
+    const moderatedMessage = this._moderator.moderateMessage(message);
 
     target.onMessage(moderatedMessage, sender);
   }
@@ -82,7 +104,7 @@ export class Telegram implements IMessenger {
     message: string,
     sender: IUser
   ): void {
-    const moderatedMessage = this.moderateMessage(message);
+    const moderatedMessage = this._moderator.moderateMessage(message);
 
     this._groupService.sendMessageToGroup(groupId, moderatedMessage, sender);
   }
@@ -133,15 +155,5 @@ export class Telegram implements IMessenger {
 
   public getGroupsByUser(user: IUser): IGroup[] {
     return this._groupService.getGroupsByUser(user);
-  }
-
-  private moderateMessage(message: string): string {
-    if (
-      ["xxx", "make", "me", "slap", "move"].some((word) => message === word)
-    ) {
-      return "Message is not allowed";
-    }
-
-    return message;
   }
 }
