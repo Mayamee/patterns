@@ -93,10 +93,11 @@ export interface IUniqIdGenerator {
 }
 
 export type LoggerContext = {
-  severity?: string;
   additionalInfo?: string;
 };
 
 export interface ILogger {
   log(message: string, ctx?: LoggerContext): void;
+  error(message: string, ctx?: LoggerContext): void;
+  warning(message: string, ctx?: LoggerContext): void;
 }

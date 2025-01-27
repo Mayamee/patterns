@@ -9,12 +9,27 @@ import {
 } from "./types";
 
 export class Logger implements ILogger {
-  public log(message: string, ctx?: LoggerContext): void {
-    const severity = ctx?.severity ?? "INFO";
+  private performLog(
+    message: string,
+    severity: string,
+    ctx?: LoggerContext
+  ): void {
     const additionalInfo = ctx?.additionalInfo ? ` ${ctx.additionalInfo} ` : "";
     const dateInfo = new Date().toISOString();
 
     console.log(`[${severity}]:${message}${additionalInfo}{${dateInfo}}`);
+  }
+
+  public log(message: string, ctx?: LoggerContext): void {
+    this.performLog(message, "INFO", ctx);
+  }
+
+  public error(message: string, ctx?: LoggerContext): void {
+    this.performLog(message, "ERROR", ctx);
+  }
+
+  public warning(message: string, ctx?: LoggerContext): void {
+    this.performLog(message, "WARNING", ctx);
   }
 }
 
@@ -80,8 +95,7 @@ export class Telegram implements IMessenger {
     const status = this._groupService.setGroupName(groupId, name, issuer);
 
     if (status.errorMessage) {
-      this._logger.log(status.errorMessage, {
-        severity: "ERROR",
+      this._logger.error(status.errorMessage, {
         additionalInfo: JSON.stringify({
           groupId,
           issuerName: issuer.name,
@@ -105,8 +119,7 @@ export class Telegram implements IMessenger {
     );
 
     if (status.errorMessage) {
-      this._logger.log(status.errorMessage, {
-        severity: "ERROR",
+      this._logger.error(status.errorMessage, {
         additionalInfo: JSON.stringify({
           groupId,
           issuerName: issuer.name,
