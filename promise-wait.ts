@@ -21,6 +21,7 @@ const main = async () => {
 
     for (const promise of promises) {
       const value = await promise;
+      // Тут можно отслеживать и отображать пользователю прогресс выполнения всех асинхронных операций
       console.log("success", value);
     }
   } catch (error) {
