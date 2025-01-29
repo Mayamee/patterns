@@ -1,6 +1,8 @@
 const makeSpoon = () => {
-  console.log('Making spoon');
-}
+  console.log("Making spoon");
+};
 
 // Может использоваться для идендификации обработчиков
-console.log(String(makeSpoon));
+const identityHash = String(makeSpoon);
+
+console.log(identityHash);
