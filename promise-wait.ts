@@ -19,11 +19,16 @@ const main = async () => {
       // --- Но если мы добавим catch то код выполнится корректно и не будет ждать выполнения всех промисов
       .catch(() => {});
 
-    for (const promise of promises) {
-      const value = await promise;
+    for await (const result of promises) {
       // Тут можно отслеживать и отображать пользователю прогресс выполнения всех асинхронных операций
-      console.log("success", value);
+      console.log("success", result);
     }
+
+    // Альтернатива
+    // for (const promise of promises) {
+    //   const value = await promise;
+    //   console.log("success", value);
+    // }
   } catch (error) {
     console.error("error", error);
   }
