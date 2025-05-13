@@ -245,7 +245,7 @@ Note: Services на бекеде это часть модели, они явля
 | Особенность           | MVC                       | MVP                       | MVVM                                  |
 | --------------------- | ------------------------- | ------------------------- | ------------------------------------- |
 | Посредник             | Controller                | Presenter                 | ViewModel                             |
-| View знает о...       | Controller                | Presenter                 | ViewModel                             |
+| View знает о...       | Controller, Model                | Presenter                 | ViewModel                             |
 | Кто обновляет View    | Сам View или Controller   | Presenter вручную         | ViewModel автоматически через биндинг |
 | Связь View ↔ Logic    | View ↔ Controller ↔ Model | View → Presenter ↔ Model  | View ←→ ViewModel ↔ Model             |
 | Уровень автоматизации | Низкий                    | Средний (ручная передача) | Высокий (двусторонний биндинг)        |
