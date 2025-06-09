@@ -1,40 +1,10 @@
+import { EventEmitter } from "./components";
+
 type Todo = {
   id: number;
   title: string;
   isCompleted: boolean;
 };
-
-class EventEmitter<TCallback extends (...args: any[]) => void> {
-  private events: Record<string, Set<TCallback>> = {};
-
-  public on(event: string, callback: TCallback) {
-    if (!this.events[event]) {
-      this.events[event] = new Set();
-    }
-    this.events[event].add(callback);
-  }
-
-  public emit(event: string, ...args: any[]) {
-    if (!this.events[event]) {
-      return;
-    }
-    this.events[event].forEach((callback) => {
-      callback(...args);
-    });
-  }
-
-  public off(event: string, callback: TCallback) {
-    if (!this.events[event]) {
-      return;
-    }
-    this.events[event].delete(callback);
-  }
-}
-type EventEmitterFactory = <
-  TCallback extends (...args: any[]) => void
->() => EventEmitter<TCallback>;
-
-const eventEmitterFactory: EventEmitterFactory = () => new EventEmitter();
 
 class Model {
   private todos: Todo[] = [];
@@ -66,14 +36,11 @@ class Model {
   }
 }
 
-class ViewModel {
-  private eventEmitter: EventEmitter<() => void>;
-
-  constructor(
-    eventEmitterFactory: EventEmitterFactory,
-    private readonly model: Model
-  ) {
-    this.eventEmitter = eventEmitterFactory();
+class ViewModel extends EventEmitter<{
+  dataChanged: () => void;
+}> {
+  constructor(private readonly model: Model) {
+    super();
   }
 
   public get todosLimit() {
@@ -106,25 +73,17 @@ class ViewModel {
 
   public addTodo(title: string) {
     this.model.addTodo(title);
-    this.onDataChanged();
+    this.notify("dataChanged");
   }
 
   public removeTodo(id: number) {
     this.model.removeTodo(id);
-    this.onDataChanged();
+    this.notify("dataChanged");
   }
 
   public toggleTodo(id: number) {
     this.model.toggleTodo(id);
-    this.onDataChanged();
-  }
-
-  public subscribeToDataChanged(callback: () => void) {
-    this.eventEmitter.on("dataChanged", callback);
-  }
-
-  public onDataChanged() {
-    this.eventEmitter.emit("dataChanged");
+    this.notify("dataChanged");
   }
 }
 
@@ -137,7 +96,7 @@ class StatisticView {
     this.render();
     appContainer.appendChild(this.wrapper);
     // Подписываемся на события ViewModel о изменении данных
-    this.viewModel.subscribeToDataChanged(this.render.bind(this));
+    this.viewModel.on("dataChanged", this.render.bind(this));
   }
 
   private render() {
@@ -169,7 +128,7 @@ class AddTodoView {
     this.wrapper = document.createElement("div");
     this.render();
     appContainer.appendChild(this.wrapper);
-    this.viewModel.subscribeToDataChanged(this.render.bind(this));
+    this.viewModel.on("dataChanged", this.render.bind(this));
   }
 
   private render() {
@@ -208,7 +167,7 @@ class TodoView {
     appContainer.appendChild(todoContainer);
 
     this.todoContainer = todoContainer;
-    this.viewModel.subscribeToDataChanged(this.render.bind(this));
+    this.viewModel.on("dataChanged", this.render.bind(this));
   }
 
   private render() {
@@ -249,7 +208,7 @@ class TodoView {
 
 //=== Init ===//
 const model = new Model();
-const viewModel = new ViewModel(eventEmitterFactory, model);
+const viewModel = new ViewModel(model);
 new TodoView(viewModel);
 new AddTodoView(viewModel);
 new StatisticView(viewModel);
