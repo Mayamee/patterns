@@ -6,7 +6,9 @@ type Todo = {
   isCompleted: boolean;
 };
 
-class Model {
+class Model extends EventEmitter<{
+  dataChanged: () => void;
+}> {
   private todos: Todo[] = [];
 
   public addTodo(title: string) {
@@ -15,16 +17,22 @@ class Model {
       title,
       isCompleted: false,
     });
+
+    this.notify("dataChanged");
   }
 
   public removeTodo(id: number) {
     this.todos = this.todos.filter((todo) => todo.id !== id);
+
+    this.notify("dataChanged");
   }
 
   public toggleTodo(id: number) {
     this.todos = this.todos.map((todo) =>
       todo.id === id ? { ...todo, isCompleted: !todo.isCompleted } : todo
     );
+
+    this.notify("dataChanged");
   }
 
   public getTodos() {
@@ -33,6 +41,8 @@ class Model {
 
   public clearTodos() {
     this.todos = [];
+
+    this.notify("dataChanged");
   }
 }
 
@@ -41,6 +51,9 @@ class ViewModel extends EventEmitter<{
 }> {
   constructor(private readonly model: Model) {
     super();
+
+    // Ретрансляция событий из модели, позволяет любым компонентам взаимодействовать с моделью и при этом потребители данной ViewModel будут уведомлены
+    this.model.on("dataChanged", this.notify.bind(this, "dataChanged"));
   }
 
   public get todosLimit() {
@@ -73,17 +86,14 @@ class ViewModel extends EventEmitter<{
 
   public addTodo(title: string) {
     this.model.addTodo(title);
-    this.notify("dataChanged");
   }
 
   public removeTodo(id: number) {
     this.model.removeTodo(id);
-    this.notify("dataChanged");
   }
 
   public toggleTodo(id: number) {
     this.model.toggleTodo(id);
-    this.notify("dataChanged");
   }
 }
 
@@ -128,6 +138,7 @@ class AddTodoView {
     this.wrapper = document.createElement("div");
     this.render();
     appContainer.appendChild(this.wrapper);
+    // Подписываемся на события ViewModel о изменении данных
     this.viewModel.on("dataChanged", this.render.bind(this));
   }
 
@@ -167,6 +178,7 @@ class TodoView {
     appContainer.appendChild(todoContainer);
 
     this.todoContainer = todoContainer;
+    // Подписываемся на события ViewModel о изменении данных
     this.viewModel.on("dataChanged", this.render.bind(this));
   }
 
