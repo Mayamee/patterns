@@ -1,3 +1,29 @@
+/**
+ * MVVM — это архитектура с односторонней реактивной связью:
+ *
+ * 1. ViewModel не знает о View вообще:
+ *    - никакой ссылки, даже слабой;
+ *    - никаких callback'ов, интерфейсов и подписок на View;
+ *    - ViewModel — полностью изолированный слой бизнес-логики.
+ *
+ * 2. View знает о ViewModel:
+ *    - View подписывается на состояние, опубликованное ViewModel;
+ *    - ViewModel — источник состояния, View — потребитель и визуальный слой.
+ *
+ * 3. Ключевая суть MVVM:
+ *    - View ↔ подписка → ViewModel.state (реактивно или вручную);
+ *    - ViewModel → Model (работает с бизнес-логикой, репозиториями, API);
+ *    - ViewModel ←X→ View (никакой связи назад!)
+ *
+ * 4. MVP отличается тем, что:
+ *    - View знает о Presenter и вызывает его методы;
+ *    - Presenter знает (через интерфейс) о View и напрямую управляет её поведением.
+ *
+ * Итог: MVVM — декларативная архитектура, где инициатор изменений — ViewModel (изменил состояние),
+ * а View реагирует на эти изменения, подписавшись на данные (реактивно).
+ */
+
+import { autorun, makeAutoObservable } from "mobx";
 import { EventEmitter } from "./components";
 
 type Todo = {
@@ -7,7 +33,7 @@ type Todo = {
 };
 
 class Model extends EventEmitter<{
-  dataChanged: () => void;
+  dataChanged: (todos: Todo[]) => void;
 }> {
   private todos: Todo[] = [];
 
@@ -18,13 +44,13 @@ class Model extends EventEmitter<{
       isCompleted: false,
     });
 
-    this.notify("dataChanged");
+    this.notify("dataChanged", this.todos);
   }
 
   public removeTodo(id: number) {
     this.todos = this.todos.filter((todo) => todo.id !== id);
 
-    this.notify("dataChanged");
+    this.notify("dataChanged", this.todos);
   }
 
   public toggleTodo(id: number) {
@@ -32,7 +58,7 @@ class Model extends EventEmitter<{
       todo.id === id ? { ...todo, isCompleted: !todo.isCompleted } : todo
     );
 
-    this.notify("dataChanged");
+    this.notify("dataChanged", this.todos);
   }
 
   public getTodos() {
@@ -42,18 +68,27 @@ class Model extends EventEmitter<{
   public clearTodos() {
     this.todos = [];
 
-    this.notify("dataChanged");
+    this.notify("dataChanged", this.todos);
   }
 }
 
-class ViewModel extends EventEmitter<{
-  dataChanged: () => void;
-}> {
-  constructor(private readonly model: Model) {
-    super();
+class ViewModel {
+  private todosInner: Todo[];
 
-    // Ретрансляция событий из модели, позволяет любым компонентам взаимодействовать с моделью и при этом потребители данной ViewModel будут уведомлены
-    this.model.on("dataChanged", this.notify.bind(this, "dataChanged"));
+  constructor(private readonly model: Model) {
+    this.todosInner = this.model.getTodos();
+
+    this.model.on("dataChanged", (todos) => {
+      this.todosInner = todos;
+    });
+
+    makeAutoObservable(
+      this,
+      {},
+      {
+        autoBind: true,
+      }
+    );
   }
 
   public get todosLimit() {
@@ -61,27 +96,27 @@ class ViewModel extends EventEmitter<{
   }
 
   public get todos() {
-    return this.model.getTodos();
+    return this.todosInner;
   }
 
   public get completedTodos() {
-    return this.model.getTodos().filter((todo) => todo.isCompleted);
+    return this.todosInner.filter((todo) => todo.isCompleted);
   }
 
   public get incompleteTodos() {
-    return this.model.getTodos().filter((todo) => !todo.isCompleted);
+    return this.todosInner.filter((todo) => !todo.isCompleted);
   }
 
   public get todosCount() {
     return {
       completed: this.completedTodos.length,
       incomplete: this.incompleteTodos.length,
-      total: this.model.getTodos().length,
+      total: this.todosInner.length,
     };
   }
 
   public get isLimitReached() {
-    return this.model.getTodos().length >= this.todosLimit;
+    return this.todosInner.length >= this.todosLimit;
   }
 
   public addTodo(title: string) {
@@ -105,8 +140,8 @@ class StatisticView {
     this.wrapper = document.createElement("div");
     this.render();
     appContainer.appendChild(this.wrapper);
-    // Подписываемся на события ViewModel о изменении данных
-    this.viewModel.on("dataChanged", this.render.bind(this));
+    // Подписываемся на данные ViewModel (биндинг)
+    autorun(this.render.bind(this));
   }
 
   private render() {
@@ -138,8 +173,8 @@ class AddTodoView {
     this.wrapper = document.createElement("div");
     this.render();
     appContainer.appendChild(this.wrapper);
-    // Подписываемся на события ViewModel о изменении данных
-    this.viewModel.on("dataChanged", this.render.bind(this));
+    // Подписываемся на данные ViewModel (биндинг)
+    autorun(this.render.bind(this));
   }
 
   private render() {
@@ -178,8 +213,8 @@ class TodoView {
     appContainer.appendChild(todoContainer);
 
     this.todoContainer = todoContainer;
-    // Подписываемся на события ViewModel о изменении данных
-    this.viewModel.on("dataChanged", this.render.bind(this));
+    // Подписываемся на данные ViewModel (биндинг)
+    autorun(this.render.bind(this));
   }
 
   private render() {
