@@ -1,42 +1,14 @@
+import { EventEmitter } from "./components";
+
 type Todo = {
   id: number;
   title: string;
   isCompleted: boolean;
 };
 
-class EventEmitter<TCallback extends (...args: any[]) => void> {
-  private events: Record<string, Set<TCallback>> = {};
-
-  public on(event: string, callback: TCallback) {
-    if (!this.events[event]) {
-      this.events[event] = new Set();
-    }
-    this.events[event].add(callback);
-  }
-
-  public emit(event: string, ...args: any[]) {
-    if (!this.events[event]) {
-      return;
-    }
-    this.events[event].forEach((callback) => {
-      callback(...args);
-    });
-  }
-
-  public off(event: string, callback: TCallback) {
-    if (!this.events[event]) {
-      return;
-    }
-    this.events[event].delete(callback);
-  }
-}
-type EventEmitterFactory = <
-  TCallback extends (...args: any[]) => void
->() => EventEmitter<TCallback>;
-
-const eventEmitterFactory: EventEmitterFactory = () => new EventEmitter();
-
-class Model {
+class Model extends EventEmitter<{
+  dataChanged: () => void;
+}> {
   private todos: Todo[] = [];
 
   public addTodo(title: string) {
@@ -45,16 +17,22 @@ class Model {
       title,
       isCompleted: false,
     });
+
+    this.notify("dataChanged");
   }
 
   public removeTodo(id: number) {
     this.todos = this.todos.filter((todo) => todo.id !== id);
+
+    this.notify("dataChanged");
   }
 
   public toggleTodo(id: number) {
     this.todos = this.todos.map((todo) =>
       todo.id === id ? { ...todo, isCompleted: !todo.isCompleted } : todo
     );
+
+    this.notify("dataChanged");
   }
 
   public getTodos() {
@@ -63,60 +41,59 @@ class Model {
 
   public clearTodos() {
     this.todos = [];
+
+    this.notify("dataChanged");
   }
 }
 
-class Presenter {
-  private eventEmitter: EventEmitter<() => void>;
+class Presenter extends EventEmitter<{
+  dataChanged: () => void;
+}> {
+  constructor(private readonly model: Model) {
+    super();
 
-  private config: { limit: number };
+    // Ретрансляция событий из модели, позволяет любым компонентам взаимодействовать с моделью и при этом потребители данного Presenter будут уведомлены
+    this.model.on("dataChanged", this.notify.bind(this, "dataChanged"));
+  }
 
-  constructor(
-    private readonly model: Model,
-    eventEmitterFactory: EventEmitterFactory,
-    config: { limit: number }
-  ) {
-    this.eventEmitter = eventEmitterFactory();
-    this.config = config;
+  public get todosLimit() {
+    return 10;
+  }
+
+  public get todos() {
+    return this.model.getTodos();
+  }
+
+  public get completedTodos() {
+    return this.model.getTodos().filter((todo) => todo.isCompleted);
+  }
+
+  public get incompleteTodos() {
+    return this.model.getTodos().filter((todo) => !todo.isCompleted);
+  }
+
+  public get todosCount() {
+    return {
+      completed: this.completedTodos.length,
+      incomplete: this.incompleteTodos.length,
+      total: this.model.getTodos().length,
+    };
   }
 
   public get isLimitReached() {
-    return this.model.getTodos().length >= this.config.limit;
-  }
-
-  public on(event: string, callback: () => void) {
-    this.eventEmitter.on(event, callback);
-  }
-
-  private emit(event: string) {
-    this.eventEmitter.emit(event);
-  }
-
-  public off(event: string, callback: () => void) {
-    this.eventEmitter.off(event, callback);
+    return this.model.getTodos().length >= this.todosLimit;
   }
 
   public addTodo(title: string) {
     this.model.addTodo(title);
-    this.emit("render");
   }
 
   public removeTodo(id: number) {
     this.model.removeTodo(id);
-    this.emit("render");
   }
 
   public toggleTodo(id: number) {
     this.model.toggleTodo(id);
-    this.emit("render");
-  }
-
-  public getTodos() {
-    return this.model.getTodos();
-  }
-
-  public getConfig() {
-    return this.config;
   }
 }
 
@@ -128,32 +105,27 @@ class StatisticView {
     this.wrapper = document.createElement("div");
     this.render();
     appContainer.appendChild(this.wrapper);
-    this.presenter.on("render", this.render.bind(this));
+    // Подписываемся на события presenter о изменении данных
+    this.presenter.on("dataChanged", this.render.bind(this));
   }
 
   private render() {
     this.wrapper.innerHTML = "";
 
     const incompleteTodosText = document.createElement("div");
-    incompleteTodosText.innerText = `Incomplete todos (${
-      this.presenter.getTodos().filter((todo) => !todo.isCompleted).length
-    })`;
+    incompleteTodosText.innerText = `Incomplete todos (${this.presenter.todosCount.incomplete})`;
     this.wrapper.appendChild(incompleteTodosText);
 
     const completedTodosText = document.createElement("div");
-    completedTodosText.innerText = `Completed todos (${
-      this.presenter.getTodos().filter((todo) => todo.isCompleted).length
-    })`;
+    completedTodosText.innerText = `Completed todos (${this.presenter.todosCount.completed})`;
     this.wrapper.appendChild(completedTodosText);
 
     const totalTodosText = document.createElement("div");
-    totalTodosText.innerText = `Total todos (${
-      this.presenter.getTodos().length
-    })`;
+    totalTodosText.innerText = `Total todos (${this.presenter.todosCount.total})`;
     this.wrapper.appendChild(totalTodosText);
 
     const todoLimit = document.createElement("div");
-    todoLimit.innerText = `Todo limit (${this.presenter.getConfig().limit})`;
+    todoLimit.innerText = `Todo limit (${this.presenter.todosLimit})`;
     this.wrapper.appendChild(todoLimit);
   }
 }
@@ -166,7 +138,8 @@ class AddTodoView {
     this.wrapper = document.createElement("div");
     this.render();
     appContainer.appendChild(this.wrapper);
-    this.presenter.on("render", this.render.bind(this));
+    // Подписываемся на события presenter о изменении данных
+    this.presenter.on("dataChanged", this.render.bind(this));
   }
 
   private render() {
@@ -183,7 +156,7 @@ class AddTodoView {
       input.value = "";
     });
 
-    button.innerText = `Add todo (${presenter.getTodos().length})`;
+    button.innerText = `Add todo (${this.presenter.todosCount.total})`;
     input.placeholder = "Add todo";
 
     this.wrapper.appendChild(input);
@@ -205,12 +178,13 @@ class TodoView {
     appContainer.appendChild(todoContainer);
 
     this.todoContainer = todoContainer;
-    this.presenter.on("render", this.render.bind(this));
+    // Подписываемся на события presenter о изменении данных
+    this.presenter.on("dataChanged", this.render.bind(this));
   }
 
   private render() {
     this.clearContainer();
-    this.presenter.getTodos().forEach((todo) => {
+    this.presenter.todos.forEach((todo) => {
       const li = this.makeTodoElement(todo);
       this.todoContainer.appendChild(li);
     });
@@ -245,9 +219,8 @@ class TodoView {
 }
 
 //=== Init ===//
-const presenter = new Presenter(new Model(), eventEmitterFactory, {
-  limit: 5,
-});
+const model = new Model();
+const presenter = new Presenter(model);
 new TodoView(presenter);
 new AddTodoView(presenter);
 new StatisticView(presenter);
