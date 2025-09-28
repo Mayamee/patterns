@@ -1,25 +1,50 @@
 import styles from "./index.module.scss";
 import clsx from "clsx";
+import type { IClockView, UpdateElementType } from "./types";
+import {
+  ClockWorker,
+  makeClockWorker,
+  type ClockWorkerFactory,
+  type ClockWorkerOptions,
+} from "./clock-worker";
 
-type ClockViewOptions = {
-  updateTimeInterval: number;
-};
-class ClockView {
+class ClockView implements IClockView {
   private rootElement: HTMLElement;
+  private clockWorker: ClockWorker;
   private isMounted = false;
-  private intervalId: number | null = null;
+  private updateElements: Map<UpdateElementType, HTMLElement> = new Map();
 
   constructor(
     private readonly mountElement: HTMLElement,
-    private readonly options: ClockViewOptions = {
-      updateTimeInterval: 1000,
-    }
+    options: ClockWorkerOptions = {
+      intervalMs: 1000,
+    },
+    makeClockWorker: ClockWorkerFactory
   ) {
     this.rootElement = this.makeRootElement();
+    this.clockWorker = makeClockWorker(this, options);
   }
 
-  public render() {
-    this.beforeRender();
+  public updateView(elementType: UpdateElementType, value: string) {
+    if (!this.isMounted) {
+      return;
+    }
+
+    const element = this.updateElements.get(elementType);
+
+    if (element) {
+      element.style.setProperty("--angle-offset-idx", value);
+    }
+  }
+
+  public mount() {
+    this.rootElement.innerHTML = "";
+
+    if (!this.isMounted) {
+      this.mountElement.appendChild(this.rootElement);
+      this.clockWorker.run();
+      this.isMounted = true;
+    }
 
     const clockBody = document.createElement("div");
     clockBody.className = styles["clock-body"];
@@ -30,35 +55,17 @@ class ClockView {
     this.rootElement.appendChild(clockBody);
   }
 
-  private makeRootElement() {
-    return document.createElement("div");
-  }
-
-  private beforeRender() {
-    this.rootElement.innerHTML = "";
-
-    if (!this.isMounted) {
-      this.mount();
-    }
-  }
-
-  private mount() {
-    this.mountElement.appendChild(this.rootElement);
-    this.isMounted = true;
-    this.intervalId = window.setInterval(() => {
-      this.render();
-    }, this.options?.updateTimeInterval);
-  }
-
   public destroy() {
     if (this.isMounted) {
       this.mountElement.removeChild(this.rootElement);
+      this.clockWorker.stop();
+      this.updateElements.clear();
       this.isMounted = false;
-      if (this.intervalId) {
-        clearInterval(this.intervalId);
-        this.intervalId = null;
-      }
     }
+  }
+
+  private makeRootElement() {
+    return document.createElement("div");
   }
 
   private renderMarkers(parent: HTMLElement) {
@@ -102,24 +109,12 @@ class ClockView {
     const secondHand = document.createElement("div");
     const ringHand = document.createElement("div");
 
-    const currentHour = new Date().getHours() % 12;
-    const currentMinute = new Date().getMinutes();
-    const currentSecond = new Date().getSeconds();
-    const currentRing = 9;
+    const config = this.clockWorker.makeViewConfig();
 
-    hourHand.style.setProperty("--angle-offset-idx", currentHour.toString());
-
-    minuteHand.style.setProperty(
-      "--angle-offset-idx",
-      currentMinute.toString()
-    );
-
-    secondHand.style.setProperty(
-      "--angle-offset-idx",
-      currentSecond.toString()
-    );
-
-    ringHand.style.setProperty("--angle-offset-idx", currentRing.toString());
+    hourHand.style.setProperty("--angle-offset-idx", config.hour);
+    minuteHand.style.setProperty("--angle-offset-idx", config.minute);
+    secondHand.style.setProperty("--angle-offset-idx", config.second);
+    ringHand.style.setProperty("--angle-offset-idx", config.ring);
 
     hourHand.className = clsx(
       styles.hand,
@@ -145,14 +140,22 @@ class ClockView {
       styles["hand-ring"]
     );
 
+    this.updateElements.set("hour", hourHand);
+    this.updateElements.set("minute", minuteHand);
+    this.updateElements.set("second", secondHand);
+    this.updateElements.set("ring", ringHand);
+
     [ringHand, hourHand, minuteHand, secondHand].forEach((hand) => {
       parent.appendChild(hand);
     });
   }
 }
 
-export const makeClockView = (mountElement: HTMLElement) => {
-  const view = new ClockView(mountElement);
-  view.render();
+export const makeClockView = (
+  mountElement: HTMLElement,
+  options?: ClockWorkerOptions
+) => {
+  const view = new ClockView(mountElement, options, makeClockWorker);
+  view.mount();
   return view;
 };
