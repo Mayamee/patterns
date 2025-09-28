@@ -4,6 +4,8 @@ export type ClockWorkerOptions = {
   intervalMs?: number;
 };
 
+export type Weekday = "0" | "1" | "2" | "3" | "4" | "5" | "6";
+
 export type ClockWorkerFactory = (
   view: IClockView,
   options: ClockWorkerOptions
@@ -14,6 +16,7 @@ type ViewConfig = {
   minute: string;
   second: string;
   ring: string;
+  weekday: Weekday;
 };
 
 export class ClockWorker {
@@ -50,6 +53,7 @@ export class ClockWorker {
       minute: String(date.getMinutes()),
       second: String(date.getSeconds()),
       ring: String(9),
+      weekday: String((date.getDay() + 6) % 7) as Weekday,
     };
   }
 
@@ -69,6 +73,10 @@ export class ClockWorker {
     }
 
     if (!this.handleRingChange(config.ring)) {
+      return;
+    }
+
+    if (!this.handleWeekdayChange(config.weekday)) {
       return;
     }
   }
@@ -110,6 +118,16 @@ export class ClockWorker {
 
     this.clockView.updateView("ring", ring);
     this.viewConfig.ring = ring;
+    return true;
+  }
+
+  private handleWeekdayChange(weekday: Weekday): boolean {
+    if (this.viewConfig.weekday === weekday) {
+      return false;
+    }
+
+    this.clockView.updateView("weekday", weekday);
+    this.viewConfig.weekday = weekday;
     return true;
   }
 }

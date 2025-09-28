@@ -7,12 +7,24 @@ import {
   type ClockWorkerFactory,
   type ClockWorkerOptions,
 } from "./clock-worker";
+import { WEEKDAY_NAMES } from "./weekdayMap";
+
+type UpdateElement =
+  | {
+      element: HTMLElement;
+      isCssVar: false;
+    }
+  | {
+      element: HTMLElement;
+      isCssVar: true;
+      cssVar: string;
+    };
 
 class ClockView implements IClockView {
   private rootElement: HTMLElement;
   private clockWorker: ClockWorker;
   private isMounted = false;
-  private updateElements: Map<UpdateElementType, HTMLElement> = new Map();
+  private updateElements: Map<UpdateElementType, UpdateElement> = new Map();
 
   constructor(
     private readonly mountElement: HTMLElement,
@@ -30,10 +42,16 @@ class ClockView implements IClockView {
       return;
     }
 
-    const element = this.updateElements.get(elementType);
+    const updateElement = this.updateElements.get(elementType);
 
-    if (element) {
-      element.style.setProperty("--angle-offset-idx", value);
+    if (!updateElement) {
+      return;
+    }
+
+    if (updateElement.isCssVar) {
+      updateElement.element.style.setProperty(updateElement.cssVar, value);
+    } else {
+      updateElement.element.textContent = value;
     }
   }
 
@@ -52,6 +70,7 @@ class ClockView implements IClockView {
     this.renderHourPointers(clockBody);
     this.renderMarkers(clockBody);
     this.renderHands(clockBody);
+    this.renderWeekDay(clockBody);
     this.rootElement.appendChild(clockBody);
   }
 
@@ -81,6 +100,19 @@ class ClockView implements IClockView {
     });
 
     markers.forEach((marker) => parent.appendChild(marker));
+  }
+
+  private renderWeekDay(parent: HTMLElement) {
+    const config = this.clockWorker.makeViewConfig();
+    const element = document.createElement("div");
+    element.textContent = WEEKDAY_NAMES[config.weekday];
+    element.className = styles["week-day"];
+    this.updateElements.set("weekday", {
+      element,
+      isCssVar: false,
+    });
+
+    parent.appendChild(element);
   }
 
   private renderHourPointers(parent: HTMLElement) {
@@ -140,10 +172,29 @@ class ClockView implements IClockView {
       styles["hand-ring"]
     );
 
-    this.updateElements.set("hour", hourHand);
-    this.updateElements.set("minute", minuteHand);
-    this.updateElements.set("second", secondHand);
-    this.updateElements.set("ring", ringHand);
+    this.updateElements.set("hour", {
+      element: hourHand,
+      isCssVar: true,
+      cssVar: "--angle-offset-idx",
+    });
+
+    this.updateElements.set("minute", {
+      element: minuteHand,
+      isCssVar: true,
+      cssVar: "--angle-offset-idx",
+    });
+
+    this.updateElements.set("second", {
+      element: secondHand,
+      isCssVar: true,
+      cssVar: "--angle-offset-idx",
+    });
+
+    this.updateElements.set("ring", {
+      element: ringHand,
+      isCssVar: true,
+      cssVar: "--angle-offset-idx",
+    });
 
     [ringHand, hourHand, minuteHand, secondHand].forEach((hand) => {
       parent.appendChild(hand);
