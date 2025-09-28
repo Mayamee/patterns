@@ -1,0 +1,150 @@
+.clock-body {
+  --size: 800px;
+  --border-size: 40px;
+  --max-free-space-from-center: calc(var(--size) / 2 - var(--border-size));
+  --marker-z-index: -1;
+  --number-z-index: 1;
+  --hand-ring-z-index: 2;
+  --hand-holder-z-index: 3;
+  --hand-holder-size: 40px;
+  font-family: monospace;
+  width: var(--size);
+  height: var(--size);
+  border: var(--border-size) solid purple;
+  border-radius: 50%;
+  position: relative;
+  margin: 50px auto;
+}
+
+.hand {
+  --hand-width: 6px;
+  --hand-color: black;
+  --hand-height: 30px;
+  --hand-border-radius: 6px;
+  --angle-step: 0deg;
+
+  background: var(--hand-color);
+  width: var(--hand-width);
+  border-radius: var(--hand-border-radius);
+  z-index: var(--hand-z-index, 0);
+  position: absolute;
+  user-select: none;
+  height: var(--hand-height);
+  top: 50%;
+  left: 50%;
+  transform-origin: bottom center;
+  transform: translate(-50%, -100%)
+    rotate(calc(var(--angle-offset-idx) * var(--angle-step)));
+}
+
+.hand-step-hour {
+  --angle-step: 30deg;
+}
+
+.hand-step-minute {
+  --angle-step: 6deg;
+}
+
+.hand-hour {
+  --hand-width: min(var(--hand-holder-size), 20px);
+  --hand-height: min(var(--max-free-space-from-center), 250px);
+  --hand-color: rgb(27, 175, 37);
+  --hand-border-radius: 10px;
+}
+
+.hand-minute {
+  --hand-width: min(var(--hand-holder-size), 10px);
+  --hand-height: 320px;
+  --hand-border-radius: 8px;
+}
+
+.hand-second {
+  --hand-width: min(var(--hand-holder-size), 4px);
+  --hand-height: min(var(--max-free-space-from-center), 350px);
+  --hand-border-radius: 4px;
+  --angle-step: 6deg;
+}
+
+.hand-ring {
+  --hand-width: min(var(--hand-holder-size), 4px);
+  --hand-height: min(var(--max-free-space-from-center), 380px);
+  --hand-border-radius: 4px;
+  --hand-color: rgb(255, 251, 0);
+}
+
+.week-day-name {
+}
+
+.hour-pointer {
+  --angle-offset: 30deg;
+  font-size: 50px;
+  font-weight: bold;
+  position: absolute;
+  user-select: none;
+  height: var(--max-free-space-from-center);
+  top: 0;
+  left: 50%;
+  transform-origin: bottom center;
+  padding-top: 20px;
+  transform: translateX(-50%)
+    rotate(calc(var(--angle-offset-idx) * var(--angle-offset)));
+  div {
+    transform: rotate(calc(-1 * var(--angle-offset-idx) * var(--angle-offset)));
+  }
+}
+
+.hand-holder {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: var(--hand-holder-size);
+  height: var(--hand-holder-size);
+  background: black;
+  border-radius: 50%;
+  z-index: var(--hand-holder-z-index);
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: calc(var(--hand-holder-size) / 2);
+    height: calc(var(--hand-holder-size) / 2);
+    background: white;
+    border-radius: 50%;
+  }
+}
+
+.marker {
+  --angle-minute-offset: 6deg;
+  --width: 4px;
+  position: absolute;
+  user-select: none;
+  height: var(--max-free-space-from-center);
+  width: var(--width);
+  top: 50%;
+  left: 50%;
+  transform-origin: bottom center;
+  transform: translate(-50%, -100%)
+    rotate(calc(var(--angle-offset-idx) * var(--angle-minute-offset)));
+  div {
+    width: var(--width);
+    height: 10px;
+    background: black;
+    border-radius: 3px;
+    margin-top: -2px;
+  }
+
+  z-index: var(--marker-z-index);
+}
+
+.marker-hour {
+  // Ширина должна наследоваться
+  --width: 6px;
+  div {
+    height: 20px;
+    background: rgb(27, 175, 37);
+  }
+}
