@@ -1,23 +1,13 @@
-import type { IClockView } from "./types";
+import type { IClockView, ViewConfig, Weekday } from "./types";
 
 export type ClockWorkerOptions = {
   intervalMs?: number;
 };
 
-export type Weekday = "0" | "1" | "2" | "3" | "4" | "5" | "6";
-
 export type ClockWorkerFactory = (
   view: IClockView,
   options: ClockWorkerOptions
 ) => ClockWorker;
-
-type ViewConfig = {
-  hour: string;
-  minute: string;
-  second: string;
-  ring: string;
-  weekday: Weekday;
-};
 
 export class ClockWorker {
   private intervalId: number | null = null;
@@ -49,10 +39,10 @@ export class ClockWorker {
     const date = new Date();
 
     return {
-      hour: String(date.getHours() % 12),
-      minute: String(date.getMinutes()),
-      second: String(date.getSeconds()),
-      ring: String(9),
+      hour: date.getHours(),
+      minute: date.getMinutes(),
+      second: date.getSeconds(),
+      ring: 9,
       weekday: String((date.getDay() + 6) % 7) as Weekday,
     };
   }
@@ -60,28 +50,14 @@ export class ClockWorker {
   private handleViewConfigChange() {
     const config = this.makeViewConfig();
 
-    if (!this.handleSecondChange(config.second)) {
-      return;
-    }
-
-    if (!this.handleMinuteChange(config.minute)) {
-      return;
-    }
-
-    if (!this.handleHourChange(config.hour)) {
-      return;
-    }
-
-    if (!this.handleRingChange(config.ring)) {
-      return;
-    }
-
-    if (!this.handleWeekdayChange(config.weekday)) {
-      return;
-    }
+    this.handleSecondChange(config.second) &&
+      this.handleMinuteChange(config.minute) &&
+      this.handleHourChange(config.hour) &&
+      this.handleRingChange(config.ring) &&
+      this.handleWeekdayChange(config.weekday);
   }
 
-  private handleHourChange(hour: string): boolean {
+  private handleHourChange(hour: ViewConfig["hour"]): boolean {
     if (this.viewConfig.hour === hour) {
       return false;
     }
@@ -91,7 +67,7 @@ export class ClockWorker {
     return true;
   }
 
-  private handleMinuteChange(minute: string): boolean {
+  private handleMinuteChange(minute: ViewConfig["minute"]): boolean {
     if (this.viewConfig.minute === minute) {
       return false;
     }
@@ -101,7 +77,7 @@ export class ClockWorker {
     return true;
   }
 
-  private handleSecondChange(second: string): boolean {
+  private handleSecondChange(second: ViewConfig["second"]): boolean {
     if (this.viewConfig.second === second) {
       return false;
     }
@@ -111,13 +87,14 @@ export class ClockWorker {
     return true;
   }
 
-  private handleRingChange(ring: string): boolean {
-    if (this.viewConfig.ring === ring) {
-      return false;
+  private handleRingChange(ring: ViewConfig["ring"]): boolean {
+    if (this.viewConfig.ring !== ring) {
+      // Точка эмита события для будильника
+      this.clockView.updateView("ring", ring);
+      this.viewConfig.ring = ring;
     }
 
-    this.clockView.updateView("ring", ring);
-    this.viewConfig.ring = ring;
+    // Всегда должно возвращать true, чтобы не блокировать обработку дальшейшей цепочки
     return true;
   }
 

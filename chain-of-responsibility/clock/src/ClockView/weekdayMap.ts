@@ -1,4 +1,4 @@
-import type { Weekday } from "./clock-worker";
+import type { Weekday } from "./types";
 
 export const WEEKDAY_NAMES: Record<Weekday, string> = {
   "0": "Понедельник",

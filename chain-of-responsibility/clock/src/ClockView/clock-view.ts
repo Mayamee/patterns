@@ -1,6 +1,13 @@
 import styles from "./index.module.scss";
 import clsx from "clsx";
-import type { IClockView, UpdateElementType } from "./types";
+import {
+  isUpdateCssVarElement,
+  isWeekday,
+  type ElementTypeValueMap,
+  type IClockView,
+  type UpdateElement,
+  type UpdateElementType,
+} from "./types";
 import {
   ClockWorker,
   makeClockWorker,
@@ -8,17 +15,6 @@ import {
   type ClockWorkerOptions,
 } from "./clock-worker";
 import { WEEKDAY_NAMES } from "./weekdayMap";
-
-type UpdateElement =
-  | {
-      element: HTMLElement;
-      isCssVar: false;
-    }
-  | {
-      element: HTMLElement;
-      isCssVar: true;
-      cssVar: string;
-    };
 
 class ClockView implements IClockView {
   private rootElement: HTMLElement;
@@ -37,7 +33,10 @@ class ClockView implements IClockView {
     this.clockWorker = makeClockWorker(this, options);
   }
 
-  public updateView(elementType: UpdateElementType, value: string) {
+  public updateView<TElementType extends UpdateElementType>(
+    elementType: TElementType,
+    value: ElementTypeValueMap<TElementType>
+  ) {
     if (!this.isMounted) {
       return;
     }
@@ -48,10 +47,17 @@ class ClockView implements IClockView {
       return;
     }
 
-    if (updateElement.isCssVar) {
-      updateElement.element.style.setProperty(updateElement.cssVar, value);
-    } else {
-      updateElement.element.textContent = value;
+    if (isUpdateCssVarElement(updateElement) && typeof value === "number") {
+      const { cssVar, element } = updateElement;
+
+      element.style.setProperty(cssVar, String(value));
+
+      return;
+    }
+
+    if (updateElement instanceof HTMLElement && isWeekday(value)) {
+      updateElement.textContent = WEEKDAY_NAMES[value];
+      return;
     }
   }
 
@@ -103,14 +109,11 @@ class ClockView implements IClockView {
   }
 
   private renderWeekDay(parent: HTMLElement) {
-    const config = this.clockWorker.makeViewConfig();
+    const config = this.getViewConfig();
     const element = document.createElement("div");
     element.textContent = WEEKDAY_NAMES[config.weekday];
     element.className = styles["week-day"];
-    this.updateElements.set("weekday", {
-      element,
-      isCssVar: false,
-    });
+    this.updateElements.set("weekday", element);
 
     parent.appendChild(element);
   }
@@ -141,7 +144,7 @@ class ClockView implements IClockView {
     const secondHand = document.createElement("div");
     const ringHand = document.createElement("div");
 
-    const config = this.clockWorker.makeViewConfig();
+    const config = this.getViewConfig();
 
     hourHand.style.setProperty("--angle-offset-idx", config.hour);
     minuteHand.style.setProperty("--angle-offset-idx", config.minute);
@@ -174,31 +177,38 @@ class ClockView implements IClockView {
 
     this.updateElements.set("hour", {
       element: hourHand,
-      isCssVar: true,
       cssVar: "--angle-offset-idx",
     });
 
     this.updateElements.set("minute", {
       element: minuteHand,
-      isCssVar: true,
       cssVar: "--angle-offset-idx",
     });
 
     this.updateElements.set("second", {
       element: secondHand,
-      isCssVar: true,
       cssVar: "--angle-offset-idx",
     });
 
     this.updateElements.set("ring", {
       element: ringHand,
-      isCssVar: true,
       cssVar: "--angle-offset-idx",
     });
 
     [ringHand, hourHand, minuteHand, secondHand].forEach((hand) => {
       parent.appendChild(hand);
     });
+  }
+
+  private getViewConfig() {
+    const config = this.clockWorker.makeViewConfig();
+    return {
+      hour: String(config.hour % 12),
+      minute: String(config.minute),
+      second: String(config.second),
+      ring: String(config.ring),
+      weekday: config.weekday,
+    };
   }
 }
 

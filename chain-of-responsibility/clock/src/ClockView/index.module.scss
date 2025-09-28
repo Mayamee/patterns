@@ -35,6 +35,9 @@
   transform-origin: bottom center;
   transform: translate(-50%, -100%)
     rotate(calc(var(--angle-offset-idx) * var(--angle-step)));
+
+  /* Тут есть проблема граничного перехода 59 => 0 11 => 0, transition разворачивает часы против часовой стрелки, как будет время и желание разбери вопрос */
+  transition: transform 0.5s ease-in-out;
 }
 
 .hand-step-hour {
