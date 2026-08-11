@@ -36,6 +36,8 @@ const Child = (props: ChildProps) => {
     set: (value: number) => setState(value),
   }));
 
+  console.log("[Child] Rendered with state:", state);
+
   return <div>[Child] Current State: {state}</div>;
 };
 
@@ -60,6 +62,8 @@ const ChildAutoMemo = (props: ChildProps) => {
   // Создаем контроллер замыкаем необходимые данные и отправляем через callback
   props.onRender(getController);
 
+  console.log("[Child-Memo] Rendered with state:", value);
+
   return <div>[Child-Memo] Current State: {value}</div>;
 };
 
@@ -73,6 +77,8 @@ const ChildImperative = forwardRef<Handlers | undefined, ChildImperativeProps>(
       reset: () => setState(0),
       set: (value: number) => setState(value),
     }));
+
+    console.log("[ChildImperative] Rendered with state:", state);
 
     return <div>[ChildImperative] Current State: {state}</div>;
   }
@@ -91,6 +97,14 @@ const ControlPanel = ({
   // const controller = controllerRef.current;
   //? Info Для актуального считывания нужно передать ссылку на объект который не будет перезатираться...
   // TODO разобраться тут почему так
+  /*
+   * Ответ тебе спустя 2 года, если я правильно понимаю тут ты сразу считал ссылку на контроллер, который тут появится только после инициализации Child, тк. ControlPanel инициализируется раньше то в current поле будет undefined, в свою очередь
+   * если тут работать с исходным объектом не заходя в current то там появится попозже нужная ссылка на контроллер
+   * Этот компонент тупо раньше рендерится чем Child
+  */
+
+  console.log(`[ControlPanel] ${title} controllerRef.current:`, controllerRef.current);
+
 
   return (
     <div>
@@ -142,11 +156,6 @@ const Parent = () => {
   const childImperativeRef = useRef<Handlers | undefined>(undefined);
   const childAutoMemoRef = useRef<Handlers | undefined>(undefined);
 
-  // @ts-ignore
-  window.childRef = childRef.current;
-  // @ts-ignore
-  window.childImperativeRef = childImperativeRef.current;
-
   const renderAdditionalController = (controllerRef: HandlersRef) => {
     return (
       <ChildControlPanelAdditional
@@ -179,8 +188,7 @@ const Parent = () => {
             {/* Несколько child это естественно не будет поддерживать, но можно сделать мультиконтроллер с авторегистрацией компонентов */}
             <Child
               onRender={(getHandlers: HandlersGetter) => {
-                const handlers = getHandlers();
-                childRef.current = handlers;
+                childRef.current = getHandlers();
               }}
             />
           </li>

@@ -1,8 +1,6 @@
-// import { ImperativeHandle } from "./ImperativeHandle";
+import { ImperativeHandle } from "./ImperativeHandle";
 
-import { Strategy } from "./Strategy";
 
-export function App() {
-  // return <ImperativeHandle />;
-  return <Strategy />;
+export default function App() {
+  return <ImperativeHandle />;
 }
