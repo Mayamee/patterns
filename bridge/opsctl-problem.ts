@@ -46,11 +46,11 @@ interface DiagnosticPayload {
 abstract class DiagnosticExport {
   abstract readonly label: string;
   abstract collect(sinceMinutes: number): DiagnosticPayload;
-  abstract deliver(payload: DiagnosticPayload, target: string): void;
+  abstract send(payload: DiagnosticPayload, target: string): void;
 
   run(sinceMinutes: number, target: string): void {
     const payload = this.collect(sinceMinutes);
-    this.deliver(payload, target);
+    this.send(payload, target);
     console.log(`[ok] ${this.label} → ${target}`);
   }
 }
@@ -69,7 +69,7 @@ class LogsToFileExport extends DiagnosticExport {
     };
   }
 
-  deliver(payload: DiagnosticPayload, target: string): void {
+  send(payload: DiagnosticPayload, target: string): void {
     // fs.writeFileSync(target, payload.body)
     console.log(`write file ${target}, bytes=${payload.body.length}`);
   }
@@ -87,7 +87,7 @@ class LogsToStdoutExport extends DiagnosticExport {
     };
   }
 
-  deliver(payload: DiagnosticPayload, _target: string): void {
+  send(payload: DiagnosticPayload, _target: string): void {
     process.stdout.write(payload.body + "\n");
   }
 }
@@ -105,7 +105,7 @@ class LogsToHttpExport extends DiagnosticExport {
     };
   }
 
-  deliver(payload: DiagnosticPayload, target: string): void {
+  send(payload: DiagnosticPayload, target: string): void {
     // fetch(target, { method: "POST", body: JSON.stringify(payload) })
     console.log(`POST ${target} kind=${payload.kind}`);
   }
@@ -123,7 +123,7 @@ class LogsToSshExport extends DiagnosticExport {
     };
   }
 
-  deliver(payload: DiagnosticPayload, target: string): void {
+  send(payload: DiagnosticPayload, target: string): void {
     // ssh user@host "cat > /path" <<< payload
     console.log(`scp payload → ${target}`);
   }
@@ -147,7 +147,7 @@ class MetricsToFileExport extends DiagnosticExport {
     };
   }
 
-  deliver(payload: DiagnosticPayload, target: string): void {
+  send(payload: DiagnosticPayload, target: string): void {
     console.log(`write file ${target}, bytes=${payload.body.length}`);
   }
 }
@@ -168,7 +168,7 @@ class MetricsToStdoutExport extends DiagnosticExport {
     };
   }
 
-  deliver(payload: DiagnosticPayload, _target: string): void {
+  send(payload: DiagnosticPayload, _target: string): void {
     process.stdout.write(payload.body + "\n");
   }
 }
@@ -189,7 +189,7 @@ class MetricsToHttpExport extends DiagnosticExport {
     };
   }
 
-  deliver(payload: DiagnosticPayload, target: string): void {
+  send(payload: DiagnosticPayload, target: string): void {
     console.log(`POST ${target} kind=${payload.kind}`);
   }
 }
@@ -210,7 +210,7 @@ class MetricsToSshExport extends DiagnosticExport {
     };
   }
 
-  deliver(payload: DiagnosticPayload, target: string): void {
+  send(payload: DiagnosticPayload, target: string): void {
     console.log(`scp payload → ${target}`);
   }
 }
@@ -228,7 +228,7 @@ class ConfigsToFileExport extends DiagnosticExport {
       body: "nginx.conf + app.env redacted",
     };
   }
-  deliver(payload: DiagnosticPayload, target: string): void {
+  send(payload: DiagnosticPayload, target: string): void {
     console.log(`write file ${target}, bytes=${payload.body.length}`);
   }
 }
@@ -243,7 +243,7 @@ class ConfigsToStdoutExport extends DiagnosticExport {
       body: "nginx.conf + app.env redacted",
     };
   }
-  deliver(payload: DiagnosticPayload, _target: string): void {
+  send(payload: DiagnosticPayload, _target: string): void {
     process.stdout.write(payload.body + "\n");
   }
 }
@@ -258,7 +258,7 @@ class ConfigsToHttpExport extends DiagnosticExport {
       body: "nginx.conf + app.env redacted",
     };
   }
-  deliver(payload: DiagnosticPayload, target: string): void {
+  send(payload: DiagnosticPayload, target: string): void {
     console.log(`POST ${target} kind=${payload.kind}`);
   }
 }
@@ -273,7 +273,7 @@ class ConfigsToSshExport extends DiagnosticExport {
       body: "nginx.conf + app.env redacted",
     };
   }
-  deliver(payload: DiagnosticPayload, target: string): void {
+  send(payload: DiagnosticPayload, target: string): void {
     console.log(`scp payload → ${target}`);
   }
 }
@@ -412,7 +412,7 @@ main();
 /**
  * Итог боли:
  * - collect() скопирован между LogsToFile/LogsToHttp/... (ось дампа размножена каналами);
- * - deliver() скопирован между *ToFile (ось канала размножена дампами);
+ * - send() скопирован между *ToFile (ось канала размножена дампами);
  * - фабрика и god-команда знают обе оси сразу;
  * - стоимость фичи «новый канал» = O(число дампов), и наоборот.
  *
