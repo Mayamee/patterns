@@ -12,6 +12,11 @@
  * Читать как бытовую аналогию к opsctl-problem.ts.
  */
 
+// ─── Общие типы ──────────────────────────────────────────────────────────────
+
+type DrinkKind = "espresso" | "cappuccino" | "raf";
+type ChannelKind = "counter" | "table" | "pickup" | "delivery";
+
 // ═══════════════════════════════════════════════════════════════════════════
 // КОМБИНАТОРНЫЙ ВЗРЫВ
 //
@@ -22,23 +27,23 @@
 // Нет: правишь во всех четырёх классах канала.
 // ═══════════════════════════════════════════════════════════════════════════
 
-abstract class Order {
+abstract class DrinkOrder {
   abstract readonly label: string;
   /** приготовить напиток */
   abstract brew(): string;
   /** отдать клиенту */
-  abstract handOff(drink: string): void;
+  abstract give(drink: string): void;
 
   fulfill(): void {
     const drink = this.brew();
-    this.handOff(drink);
+    this.give(drink);
     console.log(`[ok] ${this.label}`);
   }
 }
 
 // --- капучино × каждый канал -------------------------------------------------
 
-class CappuccinoAtCounter extends Order {
+class CappuccinoAtCounter extends DrinkOrder {
   readonly label = "капучино → стойка";
 
   brew(): string {
@@ -46,13 +51,13 @@ class CappuccinoAtCounter extends Order {
     return "эспрессо + молоко + пенка";
   }
 
-  handOff(drink: string): void {
+  give(drink: string): void {
     // …а логика «отдать у стойки» — тоже здесь. Две оси в одном классе.
     console.log(`отдать у стойки: ${drink}`);
   }
 }
 
-class CappuccinoToTable extends Order {
+class CappuccinoToTable extends DrinkOrder {
   readonly label = "капучино → зал";
 
   brew(): string {
@@ -60,134 +65,134 @@ class CappuccinoToTable extends Order {
     return "эспрессо + молоко + пенка";
   }
 
-  handOff(drink: string): void {
+  give(drink: string): void {
     console.log(`отнести в зал: ${drink}`);
   }
 }
 
-class CappuccinoPickup extends Order {
+class CappuccinoPickup extends DrinkOrder {
   readonly label = "капучино → самовывоз";
 
   brew(): string {
     return "эспрессо + молоко + пенка"; // снова копия
   }
 
-  handOff(drink: string): void {
+  give(drink: string): void {
     console.log(`пакет на полку самовывоза: ${drink}`);
   }
 }
 
-class CappuccinoDelivery extends Order {
+class CappuccinoDelivery extends DrinkOrder {
   readonly label = "капучино → курьер";
 
   brew(): string {
     return "эспрессо + молоко + пенка"; // и ещё раз
   }
 
-  handOff(drink: string): void {
+  give(drink: string): void {
     console.log(`передать курьеру: ${drink}`);
   }
 }
 
 // --- раф × каждый канал ------------------------------------------------------
 
-class RafAtCounter extends Order {
+class RafAtCounter extends DrinkOrder {
   readonly label = "раф → стойка";
 
   brew(): string {
     return "эспрессо + сливки + ваниль";
   }
 
-  handOff(drink: string): void {
-    // ПРОБЛЕМА: handOff у стойки уже был в CappuccinoAtCounter.
+  give(drink: string): void {
+    // ПРОБЛЕМА: give у стойки уже был в CappuccinoAtCounter.
     console.log(`отдать у стойки: ${drink}`);
   }
 }
 
-class RafToTable extends Order {
+class RafToTable extends DrinkOrder {
   readonly label = "раф → зал";
 
   brew(): string {
     return "эспрессо + сливки + ваниль"; // копия рецепта рафа
   }
 
-  handOff(drink: string): void {
+  give(drink: string): void {
     console.log(`отнести в зал: ${drink}`);
   }
 }
 
-class RafPickup extends Order {
+class RafPickup extends DrinkOrder {
   readonly label = "раф → самовывоз";
 
   brew(): string {
     return "эспрессо + сливки + ваниль"; // снова
   }
 
-  handOff(drink: string): void {
+  give(drink: string): void {
     console.log(`пакет на полку самовывоза: ${drink}`);
   }
 }
 
-class RafDelivery extends Order {
+class RafDelivery extends DrinkOrder {
   readonly label = "раф → курьер";
 
   brew(): string {
     return "эспрессо + сливки + ваниль"; // и ещё раз
   }
 
-  handOff(drink: string): void {
+  give(drink: string): void {
     // ПРОБЛЕМА: логика курьера уже была в CappuccinoDelivery.
-    // Новый напиток = снова писать handOff для курьера.
+    // Новый напиток = снова писать give для курьера.
     console.log(`передать курьеру: ${drink}`);
   }
 }
 
 // --- эспрессо × каждый канал -------------------------------------------------
 
-class EspressoAtCounter extends Order {
+class EspressoAtCounter extends DrinkOrder {
   readonly label = "эспрессо → стойка";
 
   brew(): string {
     return "эспрессо";
   }
 
-  handOff(drink: string): void {
+  give(drink: string): void {
     console.log(`отдать у стойки: ${drink}`);
   }
 }
 
-class EspressoToTable extends Order {
+class EspressoToTable extends DrinkOrder {
   readonly label = "эспрессо → зал";
 
   brew(): string {
     return "эспрессо"; // копия
   }
 
-  handOff(drink: string): void {
+  give(drink: string): void {
     console.log(`отнести в зал: ${drink}`);
   }
 }
 
-class EspressoPickup extends Order {
+class EspressoPickup extends DrinkOrder {
   readonly label = "эспрессо → самовывоз";
 
   brew(): string {
     return "эспрессо"; // снова
   }
 
-  handOff(drink: string): void {
+  give(drink: string): void {
     console.log(`пакет на полку самовывоза: ${drink}`);
   }
 }
 
-class EspressoDelivery extends Order {
+class EspressoDelivery extends DrinkOrder {
   readonly label = "эспрессо → курьер";
 
   brew(): string {
     return "эспрессо"; // и ещё раз
   }
 
-  handOff(drink: string): void {
+  give(drink: string): void {
     console.log(`передать курьеру: ${drink}`);
   }
 }
@@ -201,11 +206,8 @@ class EspressoDelivery extends Order {
 // Легко забыть комбинацию (латте + курьер) и получить дыру в рантайме.
 // ═══════════════════════════════════════════════════════════════════════════
 
-type Drink = "espresso" | "cappuccino" | "raf";
-type Channel = "counter" | "table" | "pickup" | "delivery";
-
 class GodOrderDesk {
-  fulfill(drink: Drink, channel: Channel): void {
+  fulfill(drink: DrinkKind, channel: ChannelKind): void {
     let cup: string;
 
     // ось A
@@ -230,7 +232,7 @@ class GodOrderDesk {
         console.log(`отнести в зал: ${cup}`);
         break;
       case "pickup":
-        console.log(`пакет на полку: ${cup}`);
+        console.log(`пакет на полку самовывоза: ${cup}`);
         break;
       case "delivery":
         console.log(`передать курьеру: ${cup}`);

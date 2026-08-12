@@ -12,18 +12,23 @@
  * Бытовая картинка к opsctl-solution.ts: бариста ≠ курьер.
  */
 
+// ─── Общие типы ──────────────────────────────────────────────────────────────
+
+type DrinkKind = "espresso" | "cappuccino" | "raf";
+type ChannelKind = "counter" | "table" | "pickup" | "delivery";
+
 // ═══════════════════════════════════════════════════════════════════════════
 // IMPLEMENTATION — «как / куда отдаём»
 // Растёт отдельно: приложение, постамат, робот-разносчик…
 // ═══════════════════════════════════════════════════════════════════════════
 
 interface Handoff {
-  readonly label: string;
+  readonly kind: ChannelKind;
   give(drink: string): void;
 }
 
 class CounterHandoff implements Handoff {
-  readonly label = "стойка";
+  readonly kind = "counter" as const;
 
   give(drink: string): void {
     console.log(`отдать у стойки: ${drink}`);
@@ -31,7 +36,7 @@ class CounterHandoff implements Handoff {
 }
 
 class TableHandoff implements Handoff {
-  readonly label = "зал";
+  readonly kind = "table" as const;
 
   give(drink: string): void {
     console.log(`отнести в зал: ${drink}`);
@@ -39,15 +44,15 @@ class TableHandoff implements Handoff {
 }
 
 class PickupHandoff implements Handoff {
-  readonly label = "самовывоз";
+  readonly kind = "pickup" as const;
 
   give(drink: string): void {
     console.log(`пакет на полку самовывоза: ${drink}`);
   }
 }
 
-class CourierHandoff implements Handoff {
-  readonly label = "курьер";
+class DeliveryHandoff implements Handoff {
+  readonly kind = "delivery" as const;
 
   give(drink: string): void {
     // РЕШЕНИЕ: логика курьера живёт ОДИН раз — не в каждом *Delivery-классе напитка.
@@ -70,7 +75,7 @@ abstract class DrinkOrder {
   fulfill(): void {
     const drink = this.brew();
     this.handoff.give(drink); // делегируем выдачу — не ветвимся по каналам
-    console.log(`[ok] ${drink} → ${this.handoff.label}`);
+    console.log(`[ok] ${drink} → ${this.handoff.kind}`);
   }
 }
 
@@ -95,11 +100,8 @@ class RafOrder extends DrinkOrder {
 
 // ─── касса: собираем любую пару ──────────────────────────────────────────────
 
-type DrinkKind = "espresso" | "cappuccino" | "raf";
-type ChannelKind = "counter" | "table" | "pickup" | "delivery";
-
-function makeHandoff(channel: ChannelKind): Handoff {
-  switch (channel) {
+function createHandoff(kind: ChannelKind): Handoff {
+  switch (kind) {
     case "counter":
       return new CounterHandoff();
     case "table":
@@ -107,12 +109,12 @@ function makeHandoff(channel: ChannelKind): Handoff {
     case "pickup":
       return new PickupHandoff();
     case "delivery":
-      return new CourierHandoff();
+      return new DeliveryHandoff();
   }
 }
 
-function makeOrder(drink: DrinkKind, handoff: Handoff): DrinkOrder {
-  switch (drink) {
+function createOrder(kind: DrinkKind, handoff: Handoff): DrinkOrder {
+  switch (kind) {
     case "espresso":
       return new EspressoOrder(handoff);
     case "cappuccino":
@@ -125,9 +127,9 @@ function makeOrder(drink: DrinkKind, handoff: Handoff): DrinkOrder {
 function demo(): void {
   // Было: искать CappuccinoToTable / RafDelivery в матрице классов.
   // Стало: склеить две оси на кассе — 3 + 4 класса вместо 12.
-  makeOrder("cappuccino", makeHandoff("table")).fulfill();
-  makeOrder("raf", makeHandoff("delivery")).fulfill();
-  makeOrder("espresso", makeHandoff("pickup")).fulfill();
+  createOrder("cappuccino", createHandoff("table")).fulfill();
+  createOrder("raf", createHandoff("delivery")).fulfill();
+  createOrder("espresso", createHandoff("pickup")).fulfill();
 
   // Новый канал «приложение» = один класс Handoff.
   // Новый напиток «латте» = один класс DrinkOrder.
