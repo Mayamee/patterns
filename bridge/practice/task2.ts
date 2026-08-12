@@ -1,258 +1,350 @@
 /**
- * ЗАДАЧА 2 — отрефактори и осознанно проведи границы
+ * ЗАДАЧА 2 — легаси CRM-синка в B2B SaaS
  *
- * Домен: генератор отчётов в аналитическом CLI / batch-job.
+ * Контекст (как на работе, без ярлыка паттерна):
+ * Продукт пушит сущности из нашего приложения во внешние CRM.
+ * Исторически интеграции писали «под конкретного вендора»: наследовали
+ * базовый SalesforceSync / HubSpotSync и переопределяли куски.
+ * Потом попросили те же сущности в Pipedrive — скопировали иерархию.
+ * Потом «давайте ещё Activity». Потом «в Salesforce иначе маппим кастомные поля».
  *
- * Здесь уже ТРИ кандидата в оси (как в 3axisOpsctl), плюс ловушка:
- * не всё, что «можно выделить», обязано быть отдельной иерархией Bridge.
+ * Сейчас в бэклоге три тикета (см. внизу). Оцени стоимость на ЭТОМ коде,
+ * потом отрефактори так, чтобы тикеты стали дешёвыми.
  *
- * Кандидаты:
- *   1) ЧТО считаем     — SalesReport / UsageReport / AuditReport
- *   2) КАК сериализуем — Json / Csv / Pdf   ← часто выглядит как Strategy
- *   3) КУДА пишем      — LocalFs / S3 / Stdout
+ * Важно:
+ * - здесь нет учебной подсказки «ось A / ось B» и нет готовых ролей паттерна;
+ * - не всё, что бесит, обязано стать отдельной иерархией;
+ * - если выделишь лишнее «на будущее» — это тоже ошибка.
  *
- * Сейчас всё свалено в гибридные классы и тройной god-switch.
- *
- * Твоя цель:
- *   - развязать оси так, чтобы рост был аддитивным;
- *   - явно решить: Json/Csv/Pdf — отдельная иерархия рядом с каналом,
- *     Strategy внутри job, или деталь канала? Обоснуй в комментарии;
- *   - сохранить бизнес-правило AuditReport: перед записью маскировать
- *     поля `email` / `ip` (аналог prepare/redaction в opsctl-solution);
- *   - не плодить абстракции «на будущее», если ось не растёт.
- *
- * Критерий готовности:
- *   - нет классов вида SalesCsvToS3Report;
- *   - добавление ParquetSerializer или AzureBlobSink = +1 класс;
- *   - в шапке файла (или рядом) — 5–10 строк: какие оси ты выделил и почему
- *     сериализацию положил именно туда.
- *
- * Опора: ../3axisOpsctl-solution.ts + раздел Bridge vs Strategy в ../README.md.
+ * Критерий готовности — не «похоже на solution из папки», а:
+ *   1) тикеты ниже правятся локально (желательно +1 место на каждое изменение оси);
+ *   2) нет копипасты маппинга Contact/Deal между CRM;
+ *   3) смена транспорта/API-клиента CRM не требует трогать сборку Deal/Contact;
+ *   4) в комментарии (10–15 строк) своими словами: что росло мультипликативно,
+ *      что ты развёл, что сознательно оставил простым.
  */
 
-// ─── типы ────────────────────────────────────────────────────────────────────
-
-type ReportKind = "sales" | "usage" | "audit";
-type FormatKind = "json" | "csv" | "pdf";
-type SinkKind = "fs" | "s3" | "stdout";
-
-interface ReportRow {
+interface Contact {
   id: string;
-  email?: string;
-  ip?: string;
-  amount?: number;
-  units?: number;
-  action?: string;
+  email: string;
+  fullName: string;
 }
 
-interface ReportDocument {
-  kind: ReportKind;
+interface Deal {
+  id: string;
   title: string;
-  rows: ReportRow[];
-  generatedAt: string;
+  amountCents: number;
+  stage: "lead" | "won" | "lost";
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// A) ГИБРИДНЫЕ КЛАССЫ (кусок куба report × format × sink)
-// Имена уже кричат: SalesCsvToS3, AuditJsonToFs, …
-// ═══════════════════════════════════════════════════════════════════════════
+interface Activity {
+  id: string;
+  contactId: string;
+  note: string;
+}
 
-abstract class ReportJob {
-  abstract readonly label: string;
-  abstract collect(): ReportDocument;
-  abstract serialize(doc: ReportDocument): string;
-  abstract write(serialized: string, target: string): void;
-
-  run(target: string): void {
-    const doc = this.collect();
-    const bytes = this.serialize(doc);
-    this.write(bytes, target);
-    console.log(`[ok] ${this.label} → ${target}`);
+/** кусок «платформенного» клиента — детали HTTP/SDK вендора */
+class SalesforceApi {
+  upsertContact(fields: Record<string, string>): void {
+    console.log("SF upsert Contact", fields);
+  }
+  upsertOpportunity(fields: Record<string, unknown>): void {
+    console.log("SF upsert Opportunity", fields);
+  }
+  createTask(fields: Record<string, string>): void {
+    console.log("SF create Task", fields);
   }
 }
 
-class SalesCsvToS3 extends ReportJob {
-  readonly label = "sales|csv→s3";
+class HubSpotApi {
+  putContact(properties: Record<string, string>): void {
+    console.log("HS put contact", properties);
+  }
+  putDeal(properties: Record<string, unknown>): void {
+    console.log("HS put deal", properties);
+  }
+  putEngagement(properties: Record<string, string>): void {
+    console.log("HS put engagement", properties);
+  }
+}
 
-  collect(): ReportDocument {
+class PipedriveApi {
+  savePerson(payload: Record<string, string>): void {
+    console.log("PD save person", payload);
+  }
+  saveDeal(payload: Record<string, unknown>): void {
+    console.log("PD save deal", payload);
+  }
+  saveActivity(payload: Record<string, string>): void {
+    console.log("PD save activity", payload);
+  }
+}
+
+// ─── «удобное» наследование под вендора ──────────────────────────────────────
+// Выглядит нормально: общее для Salesforce в базе, сущности — подклассы.
+// Боль проявляется, когда та же сетка сущностей появляется у другого вендора.
+
+abstract class SalesforceSync {
+  protected api = new SalesforceApi();
+
+  abstract push(): void;
+
+  protected mapContact(c: Contact): Record<string, string> {
     return {
-      kind: "sales",
-      title: "Sales",
-      generatedAt: new Date().toISOString(),
-      rows: [
-        { id: "o-1", amount: 120 },
-        { id: "o-2", amount: 40 },
-      ],
+      Email: c.email,
+      LastName: c.fullName,
+      External_Id__c: c.id,
     };
-  }
-
-  serialize(doc: ReportDocument): string {
-    // CSV логика — будет копироваться в SalesCsvToFs, UsageCsvToS3, …
-    const header = "id,amount";
-    const lines = doc.rows.map((r) => `${r.id},${r.amount ?? ""}`);
-    return [header, ...lines].join("\n");
-  }
-
-  write(serialized: string, target: string): void {
-    console.log(`s3 put ${target} (${serialized.length}B)`);
   }
 }
 
-class AuditJsonToFs extends ReportJob {
-  readonly label = "audit|json→fs";
-
-  collect(): ReportDocument {
-    return {
-      kind: "audit",
-      title: "Audit",
-      generatedAt: new Date().toISOString(),
-      rows: [
-        { id: "e-1", email: "a@x.io", ip: "10.0.0.1", action: "login" },
-        { id: "e-2", email: "b@x.io", ip: "10.0.0.2", action: "export" },
-      ],
-    };
+class SalesforceContactSync extends SalesforceSync {
+  constructor(private contact: Contact) {
+    super();
   }
 
-  serialize(doc: ReportDocument): string {
-    // ПРОБЛЕМА: redaction свалена внутрь serialize вместе с JSON
-    const redacted = {
-      ...doc,
-      rows: doc.rows.map((r) => ({
-        ...r,
-        email: r.email ? "[REDACTED]" : undefined,
-        ip: r.ip ? "[REDACTED]" : undefined,
-      })),
-    };
-    return JSON.stringify(redacted);
-  }
-
-  write(serialized: string, target: string): void {
-    console.log(`write file ${target} (${serialized.length}B)`);
+  push(): void {
+    this.api.upsertContact(this.mapContact(this.contact));
   }
 }
 
-class UsagePdfToStdout extends ReportJob {
-  readonly label = "usage|pdf→stdout";
-
-  collect(): ReportDocument {
-    return {
-      kind: "usage",
-      title: "Usage",
-      generatedAt: new Date().toISOString(),
-      rows: [
-        { id: "u-1", units: 10 },
-        { id: "u-2", units: 3 },
-      ],
-    };
+class SalesforceDealSync extends SalesforceSync {
+  constructor(private deal: Deal) {
+    super();
   }
 
-  serialize(doc: ReportDocument): string {
-    // «PDF» условно
-    return `PDF<<${doc.title}; rows=${doc.rows.length}>>`;
-  }
+  push(): void {
+    // stage → SF picklist живёт ЗДЕСЬ; в HubSpotDealSync будет другая копия смысла
+    const stageName =
+      this.deal.stage === "won"
+        ? "Closed Won"
+        : this.deal.stage === "lost"
+          ? "Closed Lost"
+          : "Prospecting";
 
-  write(serialized: string, _target: string): void {
-    process.stdout.write(serialized + "\n");
+    this.api.upsertOpportunity({
+      Name: this.deal.title,
+      Amount: this.deal.amountCents / 100,
+      StageName: stageName,
+      External_Id__c: this.deal.id,
+    });
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// B) БОГ С ТРОЙНЫМ ВЕТВЛЕНИЕМ
-// Особый случай: audit + любой format — redaction зашит в середину метода.
-// ═══════════════════════════════════════════════════════════════════════════
-
-function godReport(
-  kind: ReportKind,
-  format: FormatKind,
-  sink: SinkKind,
-  target: string,
-): void {
-  let doc: ReportDocument;
-
-  if (kind === "sales") {
-    doc = {
-      kind: "sales",
-      title: "Sales",
-      generatedAt: new Date().toISOString(),
-      rows: [{ id: "o-1", amount: 120 }],
-    };
-  } else if (kind === "usage") {
-    doc = {
-      kind: "usage",
-      title: "Usage",
-      generatedAt: new Date().toISOString(),
-      rows: [{ id: "u-1", units: 10 }],
-    };
-  } else {
-    doc = {
-      kind: "audit",
-      title: "Audit",
-      generatedAt: new Date().toISOString(),
-      rows: [{ id: "e-1", email: "a@x.io", ip: "10.0.0.1", action: "login" }],
-    };
+class SalesforceActivitySync extends SalesforceSync {
+  constructor(private activity: Activity) {
+    super();
   }
 
-  // склейка политики с форматом
-  if (kind === "audit") {
-    doc = {
-      ...doc,
-      rows: doc.rows.map((r) => ({
-        ...r,
-        email: "[REDACTED]",
-        ip: "[REDACTED]",
-      })),
-    };
+  push(): void {
+    this.api.createTask({
+      WhoExternalId: this.activity.contactId,
+      Description: this.activity.note,
+      External_Id__c: this.activity.id,
+    });
   }
-
-  let serialized: string;
-  if (format === "json") {
-    serialized = JSON.stringify(doc);
-  } else if (format === "csv") {
-    serialized = doc.rows.map((r) => Object.values(r).join(",")).join("\n");
-  } else {
-    serialized = `PDF<<${doc.title}>>`;
-  }
-
-  if (sink === "fs") {
-    console.log(`write file ${target} (${serialized.length}B)`);
-  } else if (sink === "s3") {
-    console.log(`s3 put ${target} (${serialized.length}B)`);
-  } else {
-    process.stdout.write(serialized + "\n");
-  }
-
-  console.log(`[ok] god ${kind}|${format}→${sink}`);
 }
 
-// ─── демо «как есть» ─────────────────────────────────────────────────────────
-
-function demoBroken(): void {
-  new SalesCsvToS3().run("s3://bucket/sales.csv");
-  new AuditJsonToFs().run("./audit.json");
-  new UsagePdfToStdout().run("-");
-  godReport("audit", "csv", "s3", "s3://bucket/audit.csv");
+abstract class HubSpotSync {
+  protected api = new HubSpotApi();
+  abstract push(): void;
 }
 
-demoBroken();
+class HubSpotContactSync extends HubSpotSync {
+  constructor(private contact: Contact) {
+    super();
+  }
+
+  push(): void {
+    // тот же Contact, другой словарь полей — но знание «что такое контакт»
+    // снова внутри CRM-класса
+    this.api.putContact({
+      email: this.contact.email,
+      firstname: this.contact.fullName,
+      app_contact_id: this.contact.id,
+    });
+  }
+}
+
+class HubSpotDealSync extends HubSpotSync {
+  constructor(private deal: Deal) {
+    super();
+  }
+
+  push(): void {
+    const dealstage =
+      this.deal.stage === "won"
+        ? "closedwon"
+        : this.deal.stage === "lost"
+          ? "closedlost"
+          : "appointmentscheduled";
+
+    this.api.putDeal({
+      dealname: this.deal.title,
+      amount: String(this.deal.amountCents / 100),
+      dealstage,
+      app_deal_id: this.deal.id,
+    });
+  }
+}
+
+class HubSpotActivitySync extends HubSpotSync {
+  constructor(private activity: Activity) {
+    super();
+  }
+
+  push(): void {
+    this.api.putEngagement({
+      contact_id: this.activity.contactId,
+      body: this.activity.note,
+      app_activity_id: this.activity.id,
+    });
+  }
+}
+
+// Pipedrive добавили копипастой «как Salesforce», потому что «так уже сделано»
+abstract class PipedriveSync {
+  protected api = new PipedriveApi();
+  abstract push(): void;
+}
+
+class PipedriveContactSync extends PipedriveSync {
+  constructor(private contact: Contact) {
+    super();
+  }
+
+  push(): void {
+    this.api.savePerson({
+      email: this.contact.email,
+      name: this.contact.fullName,
+      app_id: this.contact.id,
+    });
+  }
+}
+
+class PipedriveDealSync extends PipedriveSync {
+  constructor(private deal: Deal) {
+    super();
+  }
+
+  push(): void {
+    const status =
+      this.deal.stage === "won"
+        ? "won"
+        : this.deal.stage === "lost"
+          ? "lost"
+          : "open";
+
+    this.api.saveDeal({
+      title: this.deal.title,
+      value: this.deal.amountCents / 100,
+      status,
+      app_id: this.deal.id,
+    });
+  }
+}
+
+class PipedriveActivitySync extends PipedriveSync {
+  constructor(private activity: Activity) {
+    super();
+  }
+
+  push(): void {
+    this.api.saveActivity({
+      person_app_id: this.activity.contactId,
+      note: this.activity.note,
+      app_id: this.activity.id,
+    });
+  }
+}
 
 /**
- * TODO — рефакторинг:
+ * Диспетчер интеграций. Выглядит «централизованно», но каждый новый
+ * вендор × сущность = новая ветка. Плюс особые случаи начинают жить здесь.
+ */
+function syncToCrm(
+  crm: "salesforce" | "hubspot" | "pipedrive",
+  entity: "contact" | "deal" | "activity",
+  payload: Contact | Deal | Activity,
+): void {
+  if (crm === "salesforce" && entity === "contact") {
+    new SalesforceContactSync(payload as Contact).push();
+    return;
+  }
+  if (crm === "salesforce" && entity === "deal") {
+    new SalesforceDealSync(payload as Deal).push();
+    return;
+  }
+  if (crm === "salesforce" && entity === "activity") {
+    new SalesforceActivitySync(payload as Activity).push();
+    return;
+  }
+  if (crm === "hubspot" && entity === "contact") {
+    new HubSpotContactSync(payload as Contact).push();
+    return;
+  }
+  if (crm === "hubspot" && entity === "deal") {
+    new HubSpotDealSync(payload as Deal).push();
+    return;
+  }
+  if (crm === "hubspot" && entity === "activity") {
+    new HubSpotActivitySync(payload as Activity).push();
+    return;
+  }
+  if (crm === "pipedrive" && entity === "contact") {
+    new PipedriveContactSync(payload as Contact).push();
+    return;
+  }
+  if (crm === "pipedrive" && entity === "deal") {
+    new PipedriveDealSync(payload as Deal).push();
+    return;
+  }
+  if (crm === "pipedrive" && entity === "activity") {
+    new PipedriveActivitySync(payload as Activity).push();
+    return;
+  }
+  throw new Error(`unsupported ${crm}/${entity}`);
+}
+
+// ─── как этим пользуются сейчас ──────────────────────────────────────────────
+
+function demoAsIs(): void {
+  syncToCrm("salesforce", "contact", {
+    id: "c1",
+    email: "a@x.io",
+    fullName: "Ada",
+  });
+  syncToCrm("hubspot", "deal", {
+    id: "d1",
+    title: "Acme",
+    amountCents: 9900,
+    stage: "won",
+  });
+  syncToCrm("pipedrive", "activity", {
+    id: "a1",
+    contactId: "c1",
+    note: "Called",
+  });
+}
+
+demoAsIs();
+
+/**
+ * ТИКЕТЫ ИЗ БЭКЛОГА (оценка «до» → рефакторинг → оценка «после»)
  *
- * Минимальный каркас (можешь изменить, если аргументируешь):
+ * T1. Добавить CRM «Close.com» для Contact + Deal + Activity.
+ *     Сколько новых классов / веток сегодня? Сколько должно стать после?
  *
- *   interface ReportSink { write(bytes: string, target: string): void }
- *   interface ReportFormat { serialize(doc: ReportDocument): string }  // или не interface?
- *   abstract class Report {
- *     constructor(protected format, protected sink) {}
- *     abstract collect(): ReportDocument;
- *     protected prepare(doc): ReportDocument { return doc }  // audit override
- *     run(target) { sink.write(format.serialize(prepare(collect())), target) }
- *   }
+ * T2. Во ВСЕХ CRM для Deal stage=======lead» слать amount=0 (бизнес-правило).
+ *     Где правишь сейчас? Где хочешь править один раз?
  *
- * Вопросы, на которые ответь комментарием в этом файле после решения:
- *   Q1. Format — Bridge-иерархия или Strategy? Почему?
- *   Q2. Почему redaction в prepare() у AuditReport, а не внутри JsonFormat?
- *   Q3. Что бы ты НЕ выделял, если PDF навсегда один и sink только fs?
+ * T3. Salesforce переезжает на новый Bulk API клиент (другой класс вместо
+ *     SalesforceApi). Сущности те же. Что должно остаться нетронутым?
  *
- * Затем допиши ответ 15 в questionnaire.md.
+ * Дополнительно подумай (не обязательно выделять в код):
+ *   - ретраи / rate-limit — это та же природа изменения, что CRM и сущность?
+ *   - или это сквозная политика, которую опасно делать «третьей осью ради осей»?
+ *
+ * Рефакторь этот файл. Не сверяйся с task1 как с калькой: домен другой,
+ * правильная нарезка может отличаться. Потом — ответ 15 в questionnaire.md.
  */
