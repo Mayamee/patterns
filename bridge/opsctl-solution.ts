@@ -98,7 +98,7 @@ abstract class ExportJob {
     this.channel = channel;
   }
 
-  /** Шаблон высокоуровневого сценария: collect → optionally transform → deliver */
+  /** Шаблон высокоуровневого сценария: collect → optionally transform → send */
   run(sinceMinutes: number, target: string): void {
     const payload = this.collect(sinceMinutes);
     const prepared = this.prepare(payload);
