@@ -15,7 +15,7 @@
  * - здесь РАСТУТ ДВЕ иерархии, и клиенту нужна любая пара из них.
  */
 
-// ─── Общие типы ──────────────────────────────────────────────────────────────
+// ─── Общие типы CLI ──────────────────────────────────────────────────────────
 
 type DumpKind = "logs" | "metrics" | "configs";
 type ChannelKind = "file" | "stdout" | "http" | "ssh";
@@ -23,6 +23,7 @@ type ChannelKind = "file" | "stdout" | "http" | "ssh";
 interface CliFlags {
   dump: DumpKind;
   channel: ChannelKind;
+  /** путь файла / URL webhook / user@host:/path */
   target: string;
   sinceMinutes: number;
 }
@@ -32,8 +33,6 @@ interface DiagnosticPayload {
   collectedAt: string;
   host: string;
   body: string;
-  /** метаданные, которые канал может учесть (ретраи, content-type и т.п.) */
-  contentType: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -51,9 +50,7 @@ class FileDeliveryChannel implements DeliveryChannel {
 
   send(payload: DiagnosticPayload, target: string): void {
     // fs.writeFileSync(target, payload.body)
-    console.log(
-      `[file] path=${target} type=${payload.contentType} bytes=${payload.body.length}`,
-    );
+    console.log(`write file ${target}, bytes=${payload.body.length}`);
   }
 }
 
@@ -70,11 +67,9 @@ class HttpDeliveryChannel implements DeliveryChannel {
   readonly kind = "http" as const;
 
   send(payload: DiagnosticPayload, target: string): void {
-    // fetch(target, { method: "POST", headers: { "content-type": payload.contentType }, body })
+    // fetch(target, { method: "POST", body: JSON.stringify(payload) })
     // Логика HTTP живёт ЗДЕСЬ один раз — не в каждом *ToHttpExport
-    console.log(
-      `[http] POST ${target} kind=${payload.kind} content-type=${payload.contentType}`,
-    );
+    console.log(`POST ${target} kind=${payload.kind}`);
   }
 }
 
@@ -83,7 +78,7 @@ class SshDeliveryChannel implements DeliveryChannel {
 
   send(payload: DiagnosticPayload, target: string): void {
     // ssh/scp; парсинг user@host:/path — деталь ЭТОГО канала
-    console.log(`[ssh] upload → ${target} bytes=${payload.body.length}`);
+    console.log(`scp payload → ${target}`);
   }
 }
 
@@ -129,8 +124,7 @@ class LogsExportJob extends ExportJob {
       kind: "logs",
       collectedAt: new Date().toISOString(),
       host: "api-1",
-      contentType: "text/plain",
-      body: `journalctl --since "${sinceMinutes} min ago"\nERR timeout upstream\n...`,
+      body: `journalctl --since "${sinceMinutes} min ago"\n...`,
     };
   }
 }
@@ -143,12 +137,10 @@ class MetricsExportJob extends ExportJob {
       kind: "metrics",
       collectedAt: new Date().toISOString(),
       host: "api-1",
-      contentType: "application/json",
       body: JSON.stringify({
         windowMin: sinceMinutes,
         cpuPct: 63.2,
         rssMb: 512,
-        eventLoopLagMs: 12,
       }),
     };
   }
@@ -162,7 +154,6 @@ class ConfigsExportJob extends ExportJob {
       kind: "configs",
       collectedAt: new Date().toISOString(),
       host: "api-1",
-      contentType: "text/plain",
       body: "server_name api;\nDATABASE_URL=postgres://***\n",
     };
   }
