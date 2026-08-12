@@ -89,21 +89,105 @@ class CappuccinoDelivery extends Order {
   }
 }
 
-// --- раф × те же каналы (фрагмент матрицы) -----------------------------------
-// Полные 3×4 не расписываем — суть уже видна на капучино.
-// Для рафа появятся RafAtCounter, RafToTable, RafPickup, RafDelivery…
-// Для эспрессо — ещё четыре. И так далее.
+// --- раф × каждый канал ------------------------------------------------------
 
-class RafDelivery extends Order {
-  readonly label = "раф → курьер";
+class RafAtCounter extends Order {
+  readonly label = "раф → стойка";
 
   brew(): string {
     return "эспрессо + сливки + ваниль";
   }
 
   handOff(drink: string): void {
+    // ПРОБЛЕМА: handOff у стойки уже был в CappuccinoAtCounter.
+    console.log(`отдать у стойки: ${drink}`);
+  }
+}
+
+class RafToTable extends Order {
+  readonly label = "раф → зал";
+
+  brew(): string {
+    return "эспрессо + сливки + ваниль"; // копия рецепта рафа
+  }
+
+  handOff(drink: string): void {
+    console.log(`отнести в зал: ${drink}`);
+  }
+}
+
+class RafPickup extends Order {
+  readonly label = "раф → самовывоз";
+
+  brew(): string {
+    return "эспрессо + сливки + ваниль"; // снова
+  }
+
+  handOff(drink: string): void {
+    console.log(`пакет на полку самовывоза: ${drink}`);
+  }
+}
+
+class RafDelivery extends Order {
+  readonly label = "раф → курьер";
+
+  brew(): string {
+    return "эспрессо + сливки + ваниль"; // и ещё раз
+  }
+
+  handOff(drink: string): void {
     // ПРОБЛЕМА: логика курьера уже была в CappuccinoDelivery.
     // Новый напиток = снова писать handOff для курьера.
+    console.log(`передать курьеру: ${drink}`);
+  }
+}
+
+// --- эспрессо × каждый канал -------------------------------------------------
+
+class EspressoAtCounter extends Order {
+  readonly label = "эспрессо → стойка";
+
+  brew(): string {
+    return "эспрессо";
+  }
+
+  handOff(drink: string): void {
+    console.log(`отдать у стойки: ${drink}`);
+  }
+}
+
+class EspressoToTable extends Order {
+  readonly label = "эспрессо → зал";
+
+  brew(): string {
+    return "эспрессо"; // копия
+  }
+
+  handOff(drink: string): void {
+    console.log(`отнести в зал: ${drink}`);
+  }
+}
+
+class EspressoPickup extends Order {
+  readonly label = "эспрессо → самовывоз";
+
+  brew(): string {
+    return "эспрессо"; // снова
+  }
+
+  handOff(drink: string): void {
+    console.log(`пакет на полку самовывоза: ${drink}`);
+  }
+}
+
+class EspressoDelivery extends Order {
+  readonly label = "эспрессо → курьер";
+
+  brew(): string {
+    return "эспрессо"; // и ещё раз
+  }
+
+  handOff(drink: string): void {
     console.log(`передать курьеру: ${drink}`);
   }
 }
@@ -162,7 +246,18 @@ class GodOrderDesk {
 function demo(): void {
   // Хочешь «капучино в зал» — ищешь именно CappuccinoToTable,
   // а не собираешь «капучино» + «зал» из двух независимых кусков.
+  // Все 12 комбинаций — отдельные классы:
+  new EspressoAtCounter().fulfill();
+  new EspressoToTable().fulfill();
+  new EspressoPickup().fulfill();
+  new EspressoDelivery().fulfill();
+  new CappuccinoAtCounter().fulfill();
   new CappuccinoToTable().fulfill();
+  new CappuccinoPickup().fulfill();
+  new CappuccinoDelivery().fulfill();
+  new RafAtCounter().fulfill();
+  new RafToTable().fulfill();
+  new RafPickup().fulfill();
   new RafDelivery().fulfill();
 
   new GodOrderDesk().fulfill("espresso", "pickup");
